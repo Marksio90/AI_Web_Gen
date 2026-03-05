@@ -1,0 +1,140 @@
+---
+export interface Props {
+  businessName: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  openingHours?: Record<string, string>;
+  googleMapsEmbed?: string;
+}
+
+const { businessName, phone, email, address, openingHours, googleMapsEmbed } = Astro.props;
+
+const dayNames: Record<string, string> = {
+  monday: "Poniedziałek",
+  tuesday: "Wtorek",
+  wednesday: "Środa",
+  thursday: "Czwartek",
+  friday: "Piątek",
+  saturday: "Sobota",
+  sunday: "Niedziela",
+};
+---
+
+<section id="kontakt" class="py-20 px-4" style="background-color: var(--color-secondary);">
+  <div class="max-w-6xl mx-auto">
+    <h2 class="font-heading text-3xl md:text-4xl font-bold text-center mb-4" style="color: var(--color-primary);">
+      Kontakt
+    </h2>
+    <div class="w-16 h-1 mx-auto mb-12 rounded" style="background-color: var(--color-accent);" />
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+      <!-- Contact info -->
+      <div class="space-y-6">
+        <h3 class="font-heading text-2xl font-semibold" style="color: var(--color-primary);">
+          {businessName}
+        </h3>
+
+        {address && (
+          <div class="flex items-start gap-4">
+            <div
+              class="w-10 h-10 rounded-full flex items-center justify-center text-white flex-shrink-0"
+              style="background-color: var(--color-primary);"
+            >
+              📍
+            </div>
+            <div>
+              <p class="font-semibold text-gray-900 mb-1">Adres</p>
+              <p class="text-gray-600">{address}</p>
+            </div>
+          </div>
+        )}
+
+        {phone && (
+          <div class="flex items-start gap-4">
+            <div
+              class="w-10 h-10 rounded-full flex items-center justify-center text-white flex-shrink-0"
+              style="background-color: var(--color-primary);"
+            >
+              📞
+            </div>
+            <div>
+              <p class="font-semibold text-gray-900 mb-1">Telefon</p>
+              <a href={`tel:${phone}`} class="text-gray-600 hover:underline" style="color: var(--color-accent);">
+                {phone}
+              </a>
+            </div>
+          </div>
+        )}
+
+        {email && (
+          <div class="flex items-start gap-4">
+            <div
+              class="w-10 h-10 rounded-full flex items-center justify-center text-white flex-shrink-0"
+              style="background-color: var(--color-primary);"
+            >
+              ✉️
+            </div>
+            <div>
+              <p class="font-semibold text-gray-900 mb-1">E-mail</p>
+              <a href={`mailto:${email}`} class="hover:underline" style="color: var(--color-accent);">
+                {email}
+              </a>
+            </div>
+          </div>
+        )}
+
+        {openingHours && Object.keys(openingHours).length > 0 && (
+          <div>
+            <h4 class="font-semibold text-gray-900 mb-3">Godziny otwarcia</h4>
+            <div class="space-y-2">
+              {Object.entries(openingHours).map(([day, hours]) => (
+                <div class="flex justify-between text-sm">
+                  <span class="text-gray-600">{dayNames[day] || day}</span>
+                  <span class="font-medium">{hours}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <!-- CTA -->
+        {phone && (
+          <a
+            href={`tel:${phone}`}
+            class="inline-block px-8 py-4 rounded-lg font-semibold text-white text-lg transition-transform hover:scale-105"
+            style="background-color: var(--color-accent);"
+          >
+            Zadzwoń teraz
+          </a>
+        )}
+      </div>
+
+      <!-- Map or contact form -->
+      <div class="rounded-2xl overflow-hidden shadow-lg min-h-64">
+        {googleMapsEmbed ? (
+          <iframe
+            src={googleMapsEmbed}
+            width="100%"
+            height="400"
+            style="border:0;"
+            allowfullscreen
+            loading="lazy"
+            referrerpolicy="no-referrer-when-downgrade"
+          />
+        ) : (
+          <div
+            class="h-full min-h-64 flex items-center justify-center"
+            style="background-color: var(--color-primary);"
+          >
+            <div class="text-center text-white p-8">
+              <p class="text-6xl mb-4">📍</p>
+              <p class="text-xl font-semibold">{businessName}</p>
+              {address && <p class="opacity-80 mt-2">{address}</p>}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+</section>

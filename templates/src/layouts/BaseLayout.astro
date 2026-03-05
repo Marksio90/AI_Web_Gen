@@ -1,0 +1,110 @@
+---
+/**
+ * BaseLayout — wraps every generated page.
+ * All values come from the business content JSON injected at build time.
+ */
+export interface Props {
+  title: string;
+  description: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  fontHeading: string;
+  fontBody: string;
+  canonicalUrl?: string;
+  ogImage?: string;
+  businessName: string;
+  phone?: string;
+  address?: string;
+}
+
+const {
+  title,
+  description,
+  primaryColor,
+  secondaryColor,
+  accentColor,
+  fontHeading,
+  fontBody,
+  canonicalUrl,
+  ogImage,
+  businessName,
+  phone,
+  address,
+} = Astro.props;
+
+const fontUrl = `https://fonts.googleapis.com/css2?family=${fontHeading.replace(/ /g, "+")}:wght@400;600;700&family=${fontBody.replace(/ /g, "+")}:wght@400;500&display=swap`;
+---
+
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
+
+    <!-- Open Graph -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    {ogImage && <meta property="og:image" content={ogImage} />}
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href={fontUrl} rel="stylesheet" />
+
+    <!-- CSS Custom Properties (business-specific theming) -->
+    <style define:vars={{ primaryColor, secondaryColor, accentColor, fontHeading, fontBody }}>
+      :root {
+        --color-primary: var(--primaryColor);
+        --color-secondary: var(--secondaryColor);
+        --color-accent: var(--accentColor);
+        --font-heading: var(--fontHeading);
+        --font-body: var(--fontBody);
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { font-family: var(--font-body), system-ui, sans-serif; }
+      h1, h2, h3, h4 { font-family: var(--font-heading), Georgia, serif; }
+    </style>
+
+    <!-- Demo banner (shown only on demo sites) -->
+    {import.meta.env.IS_DEMO && (
+      <style>
+        .demo-banner {
+          position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+          background: #1a1a2e; color: #fff; text-align: center;
+          padding: 10px 16px; font-size: 14px; font-family: system-ui;
+        }
+        .demo-banner a { color: #4fc3f7; font-weight: 600; }
+        body { padding-top: 44px; }
+      </style>
+    )}
+  </head>
+  <body class="bg-secondary text-gray-800">
+    {import.meta.env.IS_DEMO && (
+      <div class="demo-banner">
+        ⚡ To jest darmowa strona demonstracyjna dla <strong>{businessName}</strong>.
+        Chcesz ją uruchomić?
+        <a href={`https://yourplatform.pl?demo=${Astro.url.hostname}`}> Dowiedz się więcej →</a>
+      </div>
+    )}
+
+    <slot />
+
+    <!-- Schema.org LocalBusiness -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": businessName,
+      "telephone": phone,
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": address,
+      },
+    })} />
+  </body>
+</html>

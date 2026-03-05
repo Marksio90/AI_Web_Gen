@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+dist/
+*.egg-info/
+.pytest_cache/
+
+# Node.js
+node_modules/
+.next/
+.astro/
+dist/
+out/
+.vercel/
+
+# Environment files (never commit secrets)
+.env
+.env.local
+.env.*.local
+agents/.env
+platform/.env.local
+
+# Cloudflare
+.wrangler/
+
+# Data files (potentially large)
+crawler/data/
+agents/results.jsonl
+agents/businesses.jsonl
+templates/dist/
+
+# Prisma
+platform/prisma/dev.db
+platform/prisma/dev.db-journal
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# Logs
+*.log
+logs/

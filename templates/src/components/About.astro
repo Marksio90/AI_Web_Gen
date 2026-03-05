@@ -1,0 +1,66 @@
+---
+export interface Props {
+  text: string;
+  businessName: string;
+  image?: string;
+  variant?: "side-by-side" | "centered" | "story";
+}
+
+const { text, businessName, image, variant = "side-by-side" } = Astro.props;
+const paragraphs = text.split("\n").filter(Boolean);
+---
+
+<section id="o-nas" class="py-20 px-4" style="background-color: var(--color-secondary);">
+  <div class="max-w-6xl mx-auto">
+
+    {variant === "side-by-side" && (
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+        {image && (
+          <div class="order-2 md:order-1 rounded-2xl overflow-hidden shadow-lg">
+            <img src={image} alt={businessName} class="w-full h-80 object-cover" loading="lazy" />
+          </div>
+        )}
+        <div class={image ? "order-1 md:order-2" : "col-span-full max-w-3xl"}>
+          <h2 class="font-heading text-3xl md:text-4xl font-bold mb-4" style="color: var(--color-primary);">
+            O nas
+          </h2>
+          <div class="w-16 h-1 mb-8 rounded" style="background-color: var(--color-accent);" />
+          {paragraphs.map((p) => (
+            <p class="text-gray-700 text-lg leading-relaxed mb-4">{p}</p>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {variant === "centered" && (
+      <div class="max-w-3xl mx-auto text-center">
+        <h2 class="font-heading text-3xl md:text-4xl font-bold mb-4" style="color: var(--color-primary);">
+          O {businessName}
+        </h2>
+        <div class="w-16 h-1 mx-auto mb-8 rounded" style="background-color: var(--color-accent);" />
+        {paragraphs.map((p) => (
+          <p class="text-gray-700 text-lg leading-relaxed mb-4">{p}</p>
+        ))}
+      </div>
+    )}
+
+    {variant === "story" && (
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div class="md:col-span-1">
+          <h2 class="font-heading text-3xl font-bold mb-6" style="color: var(--color-primary);">
+            Nasza historia
+          </h2>
+          <div class="w-16 h-1 mb-6 rounded" style="background-color: var(--color-accent);" />
+          {image && (
+            <img src={image} alt={businessName} class="w-full rounded-xl shadow-md" loading="lazy" />
+          )}
+        </div>
+        <div class="md:col-span-2">
+          {paragraphs.map((p) => (
+            <p class="text-gray-700 text-lg leading-relaxed mb-6">{p}</p>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+</section>

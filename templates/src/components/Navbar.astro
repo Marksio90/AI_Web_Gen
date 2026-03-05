@@ -1,0 +1,108 @@
+---
+export interface NavLink {
+  label: string;
+  href: string;
+}
+
+export interface Props {
+  businessName: string;
+  phone?: string;
+  links?: NavLink[];
+  variant?: "dark" | "light" | "transparent";
+}
+
+const {
+  businessName,
+  phone,
+  links = [
+    { label: "O nas", href: "#o-nas" },
+    { label: "Usługi", href: "#uslugi" },
+    { label: "Opinie", href: "#opinie" },
+    { label: "Kontakt", href: "#kontakt" },
+  ],
+  variant = "dark",
+} = Astro.props;
+
+const navBg = variant === "light" ? "bg-white shadow-sm" : "bg-transparent";
+const textColor = variant === "light" ? "text-gray-900" : "text-white";
+---
+
+<nav
+  id="navbar"
+  class={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${navBg}`}
+  style={variant !== "light" ? "background-color: var(--color-primary);" : ""}
+>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+      <!-- Logo / Business name -->
+      <a href="/" class={`font-heading text-xl font-bold ${textColor}`}>
+        {businessName}
+      </a>
+
+      <!-- Desktop links -->
+      <div class="hidden md:flex items-center gap-8">
+        {links.map((link) => (
+          <a
+            href={link.href}
+            class={`text-sm font-medium hover:opacity-75 transition-opacity ${textColor}`}
+          >
+            {link.label}
+          </a>
+        ))}
+        {phone && (
+          <a
+            href={`tel:${phone}`}
+            class="px-5 py-2 rounded-lg text-sm font-semibold transition-transform hover:scale-105"
+            style="background-color: var(--color-accent); color: white;"
+          >
+            {phone}
+          </a>
+        )}
+      </div>
+
+      <!-- Mobile menu button -->
+      <button
+        id="mobile-menu-btn"
+        class={`md:hidden p-2 rounded-md ${textColor}`}
+        aria-label="Otwórz menu"
+      >
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Mobile menu (hidden by default) -->
+    <div id="mobile-menu" class="hidden md:hidden pb-4">
+      {links.map((link) => (
+        <a
+          href={link.href}
+          class={`block py-2 text-sm font-medium ${textColor} hover:opacity-75`}
+        >
+          {link.label}
+        </a>
+      ))}
+      {phone && (
+        <a href={`tel:${phone}`} class={`block py-2 text-sm font-semibold ${textColor}`}>
+          📞 {phone}
+        </a>
+      )}
+    </div>
+  </div>
+</nav>
+
+<script>
+  const btn = document.getElementById("mobile-menu-btn");
+  const menu = document.getElementById("mobile-menu");
+  btn?.addEventListener("click", () => menu?.classList.toggle("hidden"));
+
+  // Scroll-based navbar style update
+  const nav = document.getElementById("navbar");
+  window.addEventListener("scroll", () => {
+    if (window.scrollY > 50) {
+      nav?.classList.add("shadow-lg");
+    } else {
+      nav?.classList.remove("shadow-lg");
+    }
+  });
+</script>

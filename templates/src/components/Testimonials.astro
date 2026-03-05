@@ -1,0 +1,55 @@
+---
+export interface Testimonial {
+  author: string;
+  role?: string;
+  text: string;
+  rating: number;
+}
+
+export interface Props {
+  testimonials: Testimonial[];
+  title?: string;
+}
+
+const { testimonials, title = "Opinie Klientów" } = Astro.props;
+---
+
+<section id="opinie" class="py-20 px-4 bg-white">
+  <div class="max-w-6xl mx-auto">
+    <h2 class="font-heading text-3xl md:text-4xl font-bold text-center mb-4" style="color: var(--color-primary);">
+      {title}
+    </h2>
+    <div class="w-16 h-1 mx-auto mb-12 rounded" style="background-color: var(--color-accent);" />
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      {testimonials.map((t) => (
+        <div class="bg-gray-50 rounded-2xl p-8 border border-gray-100">
+          <!-- Stars -->
+          <div class="flex gap-1 mb-4">
+            {Array.from({ length: t.rating }).map(() => (
+              <span class="text-yellow-400 text-xl">★</span>
+            ))}
+            {Array.from({ length: 5 - t.rating }).map(() => (
+              <span class="text-gray-300 text-xl">★</span>
+            ))}
+          </div>
+
+          <p class="text-gray-700 leading-relaxed mb-6 italic">"{t.text}"</p>
+
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm"
+              style="background-color: var(--color-primary);"
+            >
+              {t.author.charAt(0)}
+            </div>
+            <div>
+              <p class="font-semibold text-gray-900">{t.author}</p>
+              {t.role && <p class="text-sm text-gray-500">{t.role}</p>}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
