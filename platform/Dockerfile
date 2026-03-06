@@ -66,8 +66,6 @@ USER nextjs
 EXPOSE 3000
 
 HEALTHCHECK --interval=20s --timeout=8s --start-period=45s --retries=5 \
-  CMD curl -fsS http://localhost:3000/api/health | \
-    python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('status') in ('healthy','degraded') else 1)" \
-    2>/dev/null || curl -fs http://localhost:3000/api/health > /dev/null
+  CMD curl -fs http://localhost:3000/api/health > /dev/null
 
 CMD ["node", "server.js"]

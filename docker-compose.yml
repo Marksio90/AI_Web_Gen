@@ -532,6 +532,22 @@ services:
       - monitoring
     logging: *logging
 
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:v1.1.0
+    container_name: aiwebgen-nginx-exporter
+    restart: unless-stopped
+    command:
+      - '--nginx.scrape-uri=http://nginx:8090/stub_status'
+    expose:
+      - "9113"
+    depends_on:
+      nginx:
+        condition: service_healthy
+    networks:
+      - frontend
+      - monitoring
+    logging: *logging
+
   node-exporter:
     image: prom/node-exporter:v1.8.0
     container_name: aiwebgen-node-exporter
