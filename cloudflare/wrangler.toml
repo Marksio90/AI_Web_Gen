@@ -1,0 +1,16 @@
+name = "ai-web-gen-demo-proxy"
+main = "worker.js"
+compatibility_date = "2025-03-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[r2_buckets]]
+binding = "DEMO_SITES"
+bucket_name = "demo-sites"
+# preview_bucket_name = "demo-sites-preview"  # for staging
+
+[[routes]]
+pattern = "*.demo.yourplatform.pl/*"
+zone_name = "yourplatform.pl"
+
+[vars]
+PLATFORM_DOMAIN = "yourplatform.pl"

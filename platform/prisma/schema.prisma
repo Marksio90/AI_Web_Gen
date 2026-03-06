@@ -1,0 +1,233 @@
+// Prisma schema — AI Local Business Website Generator
+// Mini-CRM with 6 core tables
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────
+// Auth (next-auth v5)
+// ─────────────────────────────────────────────────────────
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(ADMIN)
+  createdAt     DateTime  @default(now())
+
+  accounts Account[]
+  sessions Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum UserRole {
+  ADMIN
+  AGENT
+}
+
+// ─────────────────────────────────────────────────────────
+// Core CRM tables
+// ─────────────────────────────────────────────────────────
+
+model Lead {
+  id             String         @id @default(cuid())
+  // Discovery data
+  placeId        String         @unique
+  name           String
+  address        String
+  city           String
+  phone          String?
+  email          String?
+  websiteUrl     String?
+  category       BusinessCategory @default(OTHER)
+  googleMapsUrl  String?
+  rating         Float?
+  reviewCount    Int?
+  source         String         @default("google_maps")
+
+  // Pipeline state
+  stage          PipelineStage  @default(DISCOVERED)
+  websiteStatus  WebsiteStatus  @default(UNKNOWN)
+
+  // Generated content
+  demoSiteSlug   String?        @unique
+  demoSiteUrl    String?
+  designSpecJson Json?
+  contentJson    Json?
+  qcScore        Int?
+
+  // Outreach
+  outreachSentAt DateTime?
+  outreachEmail  String?
+  lastActivityAt DateTime?
+  notes          String?
+
+  // Subscription (if converted)
+  stripeCustomerId    String?
+  stripeSubscriptionId String?
+  subscriptionPlan    SubscriptionPlan?
+  subscribedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  activities Activity[]
+  campaigns  CampaignLead[]
+}
+
+model Activity {
+  id        String       @id @default(cuid())
+  leadId    String
+  type      ActivityType
+  notes     String?
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  name        String
+  status      CampaignStatus @default(DRAFT)
+  description String?
+  // Email A/B variant weights
+  variantA    Int            @default(33)
+  variantB    Int            @default(33)
+  variantC    Int            @default(34)
+  sentCount   Int            @default(0)
+  openCount   Int            @default(0)
+  replyCount  Int            @default(0)
+  createdAt   DateTime       @default(now())
+  scheduledAt DateTime?
+  completedAt DateTime?
+
+  leads CampaignLead[]
+}
+
+model CampaignLead {
+  id           String    @id @default(cuid())
+  campaignId   String
+  leadId       String
+  variantUsed  String?   // "A", "B", or "C"
+  sentAt       DateTime?
+  openedAt     DateTime?
+  repliedAt    DateTime?
+  unsubscribed Boolean   @default(false)
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, leadId])
+}
+
+model UnsubscribeToken {
+  id        String   @id @default(cuid())
+  token     String   @unique @default(cuid())
+  email     String
+  createdAt DateTime @default(now())
+  usedAt    DateTime?
+}
+
+// ─────────────────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────────────────
+
+enum BusinessCategory {
+  RESTAURANT
+  BEAUTY_SALON
+  DENTAL_CLINIC
+  AUTO_REPAIR
+  LAW_OFFICE
+  PLUMBER
+  FITNESS
+  PHARMACY
+  HOTEL
+  BAKERY
+  FLORIST
+  ACCOUNTANT
+  PHYSIOTHERAPY
+  OPTICIAN
+  OTHER
+}
+
+enum PipelineStage {
+  DISCOVERED      // Just found by crawler
+  ANALYZED        // SEO/website quality assessed
+  SITE_GENERATED  // Demo site built by agents
+  OUTREACH_SENT   // Email sent to business
+  OPENED          // Email opened (tracking pixel)
+  REPLIED         // Business responded
+  DEMO_VIEWED     // Demo site visited
+  CONVERTED       // Became paying subscriber
+  LOST            // Disqualified or opted out
+}
+
+enum WebsiteStatus {
+  NONE      // No website
+  POOR      // Poor quality website (lead target)
+  GOOD      // Adequate website (skip)
+  UNKNOWN
+}
+
+enum ActivityType {
+  DISCOVERED
+  SEO_ANALYZED
+  SITE_GENERATED
+  EMAIL_SENT
+  EMAIL_OPENED
+  EMAIL_REPLIED
+  DEMO_VIEWED
+  CALL_MADE
+  NOTE_ADDED
+  SUBSCRIBED
+  UNSUBSCRIBED
+  STAGE_CHANGED
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+}
+
+enum SubscriptionPlan {
+  STARTER    // 29 PLN/month — 1 page
+  BUSINESS   // 79 PLN/month — 5 pages
+  PRO        // 129 PLN/month — unlimited pages + custom domain
+}

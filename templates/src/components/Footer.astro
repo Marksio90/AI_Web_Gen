@@ -1,0 +1,53 @@
+---
+export interface Props {
+  businessName: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  footerText?: string;
+}
+
+const { businessName, phone, email, address, footerText } = Astro.props;
+const year = new Date().getFullYear();
+---
+
+<footer style="background-color: var(--color-primary);" class="text-white">
+  <div class="max-w-6xl mx-auto px-4 py-12">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+      <!-- Brand -->
+      <div>
+        <h3 class="font-heading text-xl font-bold mb-4">{businessName}</h3>
+        {footerText && <p class="opacity-75 text-sm leading-relaxed">{footerText}</p>}
+      </div>
+
+      <!-- Contact info -->
+      <div>
+        <h4 class="font-semibold mb-4">Kontakt</h4>
+        <div class="space-y-2 text-sm opacity-80">
+          {phone && <p>📞 <a href={`tel:${phone}`} class="hover:opacity-100">{phone}</a></p>}
+          {email && <p>✉️ <a href={`mailto:${email}`} class="hover:opacity-100">{email}</a></p>}
+          {address && <p>📍 {address}</p>}
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div>
+        <h4 class="font-semibold mb-4">Nawigacja</h4>
+        <nav class="space-y-2 text-sm opacity-80">
+          <a href="#o-nas" class="block hover:opacity-100">O nas</a>
+          <a href="#uslugi" class="block hover:opacity-100">Usługi</a>
+          <a href="#opinie" class="block hover:opacity-100">Opinie</a>
+          <a href="#kontakt" class="block hover:opacity-100">Kontakt</a>
+        </nav>
+      </div>
+    </div>
+
+    <div class="border-t border-white/20 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm opacity-60">
+      <p>© {year} {businessName}. Wszystkie prawa zastrzeżone.</p>
+      <p>
+        Strona stworzona przez
+        <a href="https://yourplatform.pl" class="hover:opacity-100 underline">AI Web Generator</a>
+      </p>
+    </div>
+  </div>
+</footer>

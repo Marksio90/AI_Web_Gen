@@ -1,0 +1,130 @@
+---
+/**
+ * Dynamic page that renders from business content JSON.
+ * At build time, BUSINESS_DATA env var contains the full GeneratedContent + DesignSpec JSON.
+ *
+ * For local development, falls back to demo data.
+ */
+import BaseLayout from "../layouts/BaseLayout.astro";
+import Hero from "../components/Hero.astro";
+import Services from "../components/Services.astro";
+import About from "../components/About.astro";
+import Testimonials from "../components/Testimonials.astro";
+import Contact from "../components/Contact.astro";
+import Navbar from "../components/Navbar.astro";
+import Footer from "../components/Footer.astro";
+
+// Business data injected at build time (or demo data for development)
+const rawData = import.meta.env.BUSINESS_DATA;
+const data = rawData ? JSON.parse(rawData) : getDemoData();
+
+const { content, design, business } = data;
+
+function getDemoData() {
+  return {
+    business: {
+      name: "Restauracja Demo",
+      phone: "+48 22 123 45 67",
+      email: "kontakt@restauracja-demo.pl",
+      address: "ul. Przykładowa 1, 00-001 Warszawa",
+      city: "Warszawa",
+    },
+    design: {
+      primaryColor: "#8B1A1A",
+      secondaryColor: "#F5E6D3",
+      accentColor: "#D4A853",
+      fontHeading: "Playfair Display",
+      fontBody: "Lato",
+      sections: ["hero", "services", "about", "testimonials", "contact"],
+    },
+    content: {
+      heroHeadline: "Tradycyjna Kuchnia Polska w Sercu Warszawy",
+      heroSubheadline: "Odkryj autentyczne smaki naszego regionu przygotowane z lokalnych składników",
+      heroCta: "Zarezerwuj stolik",
+      aboutText: "Restauracja Demo to rodzinne miejsce z wieloletnią tradycją. Każde danie przygotowujemy ze świeżych, lokalnych składników pozyskiwanych od okolicznych dostawców.\n\nNasz szef kuchni, z 20-letnim doświadczeniem, łączy tradycję z nowoczesnością, tworząc dania które zachwycają nie tylko smakiem, ale i wyglądem.\n\nZapraszamy na rodzinne obiady, romantyczne kolacje i przyjęcia okolicznościowe.",
+      services: [
+        { name: "Dania główne", description: "Tradycyjne polskie dania z najlepszych składników regionu.", price: "35 zł" },
+        { name: "Zupy domowe", description: "Gotowane codziennie według starych receptur babci.", price: "15 zł" },
+        { name: "Desery", description: "Własnoręcznie robione ciasta i desery sezonowe.", price: "20 zł" },
+        { name: "Catering", description: "Obsługa przyjęć i eventów dla grup od 10 osób.", price: "Zapytaj" },
+      ],
+      testimonials: [
+        { author: "Marek Kowalski", role: "Warszawa, Mokotów", text: "Najlepsza żurek w Warszawie! Wracam tu regularnie od trzech lat. Obsługa zawsze miła i szybka.", rating: 5 },
+        { author: "Anna Nowak", role: "Warszawa, Żoliborz", text: "Przepiękne wnętrze i autentyczne smaki. Idealne miejsce na rodzinny obiad w niedzielę.", rating: 5 },
+        { author: "Piotr Wiśniewski", role: "Warszawa, Praga", text: "Catering na wesele córki był perfekcyjny. Goście byli zachwyceni. Polecam z całego serca!", rating: 5 },
+      ],
+      metaTitle: "Restauracja Demo – Tradycyjna Kuchnia Polska | Warszawa",
+      metaDescription: "Tradycyjna kuchnia polska w sercu Warszawy. Świeże składniki, domowe receptury. Rezerwacje: +48 22 123 45 67",
+      footerText: "Serwujemy tradycyjną polską kuchnię od ponad 20 lat. Zapraszamy na lunch, kolację i przyjęcia.",
+    },
+  };
+}
+---
+
+<BaseLayout
+  title={content.metaTitle}
+  description={content.metaDescription}
+  primaryColor={design.primaryColor}
+  secondaryColor={design.secondaryColor}
+  accentColor={design.accentColor}
+  fontHeading={design.fontHeading}
+  fontBody={design.fontBody}
+  businessName={business.name}
+  phone={business.phone}
+  address={business.address}
+>
+  <Navbar
+    businessName={business.name}
+    phone={business.phone}
+  />
+
+  <!-- Sections rendered based on design.sections order -->
+  {design.sections.includes("hero") && (
+    <Hero
+      headline={content.heroHeadline}
+      subheadline={content.heroSubheadline}
+      cta={content.heroCta}
+      ctaPhone={business.phone}
+      backgroundImage={content.heroImage}
+    />
+  )}
+
+  {design.sections.includes("services") && (
+    <Services
+      services={content.services}
+      title="Nasze Usługi"
+    />
+  )}
+
+  {design.sections.includes("about") && (
+    <About
+      text={content.aboutText}
+      businessName={business.name}
+      image={content.aboutImage}
+    />
+  )}
+
+  {design.sections.includes("testimonials") && (
+    <Testimonials
+      testimonials={content.testimonials}
+    />
+  )}
+
+  {design.sections.includes("contact") && (
+    <Contact
+      businessName={business.name}
+      phone={business.phone}
+      email={business.email}
+      address={business.address}
+      openingHours={business.openingHours}
+    />
+  )}
+
+  <Footer
+    businessName={business.name}
+    phone={business.phone}
+    email={business.email}
+    address={business.address}
+    footerText={content.footerText}
+  />
+</BaseLayout>
