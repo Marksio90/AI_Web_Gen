@@ -8,12 +8,12 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # OpenAI models
-    model_crawler: str = "gpt-4.1-nano"
-    model_seo: str = "gpt-4.1-mini"
-    model_content: str = "gpt-4.1"
-    model_design: str = "gpt-4.1-mini"
-    model_email: str = "gpt-4.1-mini"
-    model_qc: str = "gpt-4.1"
+    model_crawler: str = "gpt-4o-mini"
+    model_seo: str = "gpt-4o-mini"
+    model_content: str = "gpt-4o"
+    model_design: str = "gpt-4o-mini"
+    model_email: str = "gpt-4o-mini"
+    model_qc: str = "gpt-4o"
 
     # Groq fallback model (cost ~3-10x cheaper)
     groq_model_content: str = "llama-4-scout-17b-16e-instruct"
