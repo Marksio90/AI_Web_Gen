@@ -20,3 +20,4 @@ celery[redis]>=5.4.0
 flower>=2.0.0
 redis>=5.2.0
 beautifulsoup4>=4.12.0
+prometheus-fastapi-instrumentator>=7.0.0

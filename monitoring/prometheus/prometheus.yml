@@ -1,0 +1,61 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'ai-web-gen'
+    environment: 'production'
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Next.js platform — custom metrics via /api/metrics
+  - job_name: 'platform'
+    static_configs:
+      - targets: ['platform:3000']
+    metrics_path: '/api/metrics'
+    scrape_interval: 30s
+
+  # FastAPI agents — prometheus_fastapi_instrumentator
+  - job_name: 'agents'
+    static_configs:
+      - targets: ['agents:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
+  # Celery worker — flower exports prometheus metrics
+  - job_name: 'flower'
+    static_configs:
+      - targets: ['flower:5555']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # PostgreSQL — postgres_exporter
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  # Redis — redis_exporter
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # Nginx — nginx-prometheus-exporter
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+
+  # Node exporter (host metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']

@@ -1,0 +1,42 @@
+# Python artifacts
+__pycache__
+*.py[cod]
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+dist/
+build/
+.venv
+venv
+env
+
+# Environment files (NEVER in image)
+.env
+.env.*
+!.env.example
+
+# Data files (potentially huge)
+*.jsonl
+*.json.gz
+data/
+results/
+logs/
+
+# Version control
+.git
+.gitignore
+
+# Dev tools
+.editorconfig
+*.md
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# IDE
+.vscode
+.idea

@@ -1,0 +1,108 @@
+{
+  "title": "AI Web Generator — Overview",
+  "uid": "ai-web-gen-main",
+  "version": 1,
+  "schemaVersion": 38,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "Europe/Warsaw",
+  "tags": ["ai-web-gen", "overview"],
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Platform Status",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "targets": [{ "expr": "up{job=\"platform\"}", "legendFormat": "Platform" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "id": 2, "type": "stat", "title": "Agent API Status",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "targets": [{ "expr": "up{job=\"agents\"}", "legendFormat": "Agents" }],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } }, "type": "value" }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "id": 3, "type": "stat", "title": "Celery Queue (pipeline)",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "targets": [{ "expr": "celery_queue_length{queue=\"pipeline\"}", "legendFormat": "Queue depth" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 100 }] }
+        }
+      },
+      "options": { "colorMode": "background", "graphMode": "area" }
+    },
+    {
+      "id": 4, "type": "stat", "title": "DB Connections",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "targets": [{ "expr": "pg_stat_activity_count{datname=\"ai_web_gen\"}", "legendFormat": "Active" }],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 50 }, { "color": "red", "value": 80 }] }
+        }
+      },
+      "options": { "colorMode": "background" }
+    },
+    {
+      "id": 5, "type": "stat", "title": "Redis Memory",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "targets": [{ "expr": "round(redis_memory_used_bytes / 1024 / 1024, 1)", "legendFormat": "MB used" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "MB",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 200 }, { "color": "red", "value": 240 }] }
+        }
+      },
+      "options": { "colorMode": "background" }
+    },
+    {
+      "id": 6, "type": "stat", "title": "Node Memory",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "targets": [{ "expr": "round((1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100, 1)", "legendFormat": "% used" }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 }] }
+        }
+      },
+      "options": { "colorMode": "background" }
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "HTTP Request Rate",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        { "expr": "rate(http_requests_total{job=\"agents\",status=~\"2..\"}[1m])", "legendFormat": "Agent 2xx/s" },
+        { "expr": "rate(http_requests_total{job=\"agents\",status=~\"5..\"}[1m])", "legendFormat": "Agent 5xx/s" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "id": 11, "type": "timeseries", "title": "Agent Pipeline Latency (p95)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        { "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"agents\",path=\"/process\"}[5m]))", "legendFormat": "p95 latency" },
+        { "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"agents\",path=\"/process\"}[5m]))", "legendFormat": "p50 latency" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "id": 20, "type": "logs", "title": "Application Logs",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 12 },
+      "targets": [
+        { "expr": "{service=~\"platform|agents|worker\"} |= \"\" | json", "legendFormat": "" }
+      ],
+      "options": { "showTime": true, "showLabels": true, "sortOrder": "Descending", "wrapLogMessage": true }
+    }
+  ]
+}
