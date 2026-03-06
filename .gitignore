@@ -45,3 +45,8 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Docker
+backups/
+.env.docker
+

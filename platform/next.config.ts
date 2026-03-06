@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Required for Docker standalone deployment (copies only needed files)
+  output: "standalone",
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "images.pexels.com" },
