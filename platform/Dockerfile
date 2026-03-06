@@ -1,12 +1,18 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage 1: deps  — install production node_modules
+# Stage 1: deps — install node_modules (cached layer)
 # ─────────────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm ci --prefer-offline
+COPY package.json package-lock.json* yarn.lock* pnpm-lock.yaml* ./
+# Use npm install (not npm ci) to handle missing lockfile gracefully
+RUN \
+  if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+  elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm install --frozen-lockfile; \
+  elif [ -f package-lock.json ]; then npm ci; \
+  else npm install; \
+  fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Stage 2: builder — generate Prisma client + build Next.js
@@ -18,44 +24,50 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Generate Prisma client
+# Generate Prisma client (required before Next.js build)
 RUN npx prisma generate
 
-# Build Next.js (standalone output)
+# Build Next.js standalone output
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+# Stub required env vars for build-time (runtime values come from docker-compose)
+ENV DATABASE_URL=postgresql://stub:stub@stub:5432/stub
+ENV AUTH_SECRET=build-stub-secret-not-used-at-runtime
+ENV STRIPE_SECRET_KEY=sk_test_stub
+ENV RESEND_API_KEY=re_stub
 RUN npm run build
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Stage 3: runner — minimal production image (~200 MB)
+# Stage 3: runner — minimal production image
 # ─────────────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 RUN apk add --no-cache curl openssl
 
 WORKDIR /app
-
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser  --system --uid 1001 nextjs
 
-# Copy only what's needed for production
-COPY --from=builder /app/public ./public
+# Standalone build — self-contained server
+COPY --from=builder /app/public                        ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static    ./.next/static
 
-# Copy Prisma files (needed for runtime migrations)
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+# Prisma — needed for DB operations at runtime
+COPY --from=builder --chown=nextjs:nodejs /app/prisma           ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma  ./node_modules/.prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma  ./node_modules/@prisma
 
 USER nextjs
-
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3000/api/health || exit 1
+HEALTHCHECK --interval=20s --timeout=8s --start-period=45s --retries=5 \
+  CMD curl -fsS http://localhost:3000/api/health | \
+    python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if d.get('status') in ('healthy','degraded') else 1)" \
+    2>/dev/null || curl -fs http://localhost:3000/api/health > /dev/null
 
 CMD ["node", "server.js"]

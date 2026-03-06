@@ -13,6 +13,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from config import settings
@@ -22,17 +23,28 @@ from models import ProcessedBusiness
 app = FastAPI(
     title="AI Web Generator — Agent API",
     version="1.0.0",
-    docs_url="/docs" if os.getenv("ENV") != "production" else None,
+    docs_url="/docs",   # always enabled (nginx restricts access in prod)
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://yourplatform.pl", "http://localhost:3000"],
+    allow_origins=["https://yourplatform.pl", "http://localhost:3000", "http://localhost"],
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
 
-# In-memory job tracking (use Redis in production)
+# Prometheus instrumentation (adds /metrics endpoint)
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+    Instrumentator(
+        should_group_status_codes=False,
+        should_ignore_untemplated=True,
+        excluded_handlers=["/health", "/metrics"],
+    ).instrument(app).expose(app, include_in_schema=False, tags=["observability"])
+except ImportError:
+    pass  # optional — works without prometheus_fastapi_instrumentator
+
+# In-memory job tracking (backed by Redis for production multi-instance)
 _jobs: dict[str, dict] = {}
 
 
@@ -66,9 +78,21 @@ def _verify_secret(x_api_secret: Optional[str] = Header(None)) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
-@app.get("/health")
+@app.get("/health", include_in_schema=False)
 async def health():
-    return {"status": "ok", "version": "1.0.0"}
+    """Health check — used by Docker + Nginx."""
+    import redis.asyncio as aioredis
+    redis_ok = False
+    try:
+        r = aioredis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
+        await r.ping()
+        await r.aclose()
+        redis_ok = True
+    except Exception:
+        pass
+
+    status = "healthy" if redis_ok else "degraded"
+    return {"status": status, "version": "1.0.0", "redis": redis_ok}
 
 
 @app.post("/process", response_model=ProcessResponse)

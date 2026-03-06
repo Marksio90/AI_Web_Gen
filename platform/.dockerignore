@@ -1,0 +1,46 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js build output
+.next
+out
+
+# Environment files (NEVER in image)
+.env
+.env.*
+!.env.example
+
+# Version control
+.git
+.gitignore
+
+# Dev tools
+.eslintrc*
+.prettierrc*
+*.test.ts
+*.test.tsx
+__tests__
+cypress
+playwright
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# IDE
+.vscode
+.idea
+
+# Prisma (only schema needed, not generated client)
+prisma/dev.db
+prisma/dev.db-journal
+prisma/migrations/*.sql.bak
+
+# Misc
+README.md
+docs/
+*.log
