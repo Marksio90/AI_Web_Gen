@@ -1,0 +1,100 @@
+################################################################################
+# Development overrides
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#        (or just: make dev)
+#
+# Changes from production:
+#   - Hot reload for Next.js and FastAPI (source code mounted)
+#   - Dev Dockerfiles (no multi-stage build, faster iteration)
+#   - Ports fully exposed for direct access
+#   - FastAPI /docs UI enabled
+#   - No resource limits (dev machines)
+#   - pgAdmin instead of Adminer
+#   - Redis Commander for queue inspection
+################################################################################
+
+services:
+  platform:
+    build:
+      context: ./platform
+      dockerfile: Dockerfile.dev     # dev image with npm run dev
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ./platform/src:/app/src:delegated         # hot reload
+      - ./platform/public:/app/public:delegated
+      - ./platform/prisma:/app/prisma:delegated
+      - platform_nm:/app/node_modules             # named vol → no host override
+    ports:
+      - "3000:3000"   # direct access (bypasses nginx in dev)
+    command: npm run dev
+
+  agents:
+    build:
+      context: ./agents
+      dockerfile: Dockerfile
+      target: runner
+    volumes:
+      - ./agents:/app:delegated
+    environment:
+      ENV: development
+    ports:
+      - "8000:8000"   # direct access to FastAPI + /docs
+    command: uvicorn api_server:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app
+
+  worker:
+    volumes:
+      - ./agents:/app:delegated
+    command: >
+      celery -A tasks worker
+      --loglevel=debug
+      --concurrency=2
+      -Q pipeline,crawler,email,default
+
+  beat:
+    volumes:
+      - ./agents:/app:delegated
+
+  nginx:
+    ports:
+      - "80:80"
+      - "8001:8001"
+      - "5556:5556"
+      - "8082:8082"
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  # Redis Commander — visual Redis browser
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: aiwebgen-redis-commander
+    environment:
+      REDIS_HOSTS: "local:redis:6379:0"
+    ports:
+      - "8083:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - frontend
+      - backend
+
+  # Mailpit — local email catcher (intercepts all Resend calls in dev)
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: aiwebgen-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    networks:
+      - backend
+
+volumes:
+  platform_nm:    # node_modules isolated volume
+    driver: local

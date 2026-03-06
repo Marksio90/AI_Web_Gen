@@ -1,0 +1,28 @@
+# Celery worker — shares same base image as the FastAPI service
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+RUN pip install uv
+COPY requirements.txt requirements-worker.txt* ./
+RUN uv pip install --system --no-cache -r requirements.txt
+
+COPY . .
+
+RUN groupadd -g 1001 celery && useradd -u 1001 -g celery -m celery
+USER celery
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV C_FORCE_ROOT=false
+
+# Celery worker: 4 concurrent tasks, auto-scale
+CMD ["celery", "-A", "tasks", "worker", \
+     "--loglevel=info", \
+     "--concurrency=4", \
+     "--max-tasks-per-child=100", \
+     "-Q", "pipeline,crawler,email,default"]

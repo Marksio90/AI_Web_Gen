@@ -1,0 +1,173 @@
+################################################################################
+# Production overrides
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#        (or just: make prod)
+#
+# Changes from base:
+#   - TLS via Traefik (auto Let's Encrypt)
+#   - No direct port exposure (everything via Traefik)
+#   - Restart policies: always
+#   - Log rotation
+#   - Resource limits tightened
+#   - Replicas for platform + agents
+################################################################################
+
+services:
+  traefik:
+    image: traefik:v3.3
+    container_name: aiwebgen-traefik
+    restart: always
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - traefik_certs:/letsencrypt
+    networks:
+      - frontend
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  platform:
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.platform.rule=Host(`${DOMAIN:-yourplatform.pl}`) || Host(`www.${DOMAIN:-yourplatform.pl}`)"
+      - "traefik.http.routers.platform.entrypoints=websecure"
+      - "traefik.http.routers.platform.tls.certresolver=letsencrypt"
+      - "traefik.http.services.platform.loadbalancer.server.port=3000"
+      # Security headers
+      - "traefik.http.middlewares.secheaders.headers.stsSeconds=31536000"
+      - "traefik.http.middlewares.secheaders.headers.stsIncludeSubdomains=true"
+      - "traefik.http.middlewares.secheaders.headers.stsPreload=true"
+      - "traefik.http.routers.platform.middlewares=secheaders"
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  agents:
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.agents.rule=Host(`api.${DOMAIN:-yourplatform.pl}`)"
+      - "traefik.http.routers.agents.entrypoints=websecure"
+      - "traefik.http.routers.agents.tls.certresolver=letsencrypt"
+      - "traefik.http.services.agents.loadbalancer.server.port=8000"
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  worker:
+    restart: always
+    deploy:
+      replicas: 2   # 2 workers × 4 concurrency = 8 simultaneous pipelines
+      resources:
+        limits:
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  beat:
+    restart: always
+    deploy:
+      replicas: 1   # MUST be 1 — only one scheduler
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  flower:
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.flower.rule=Host(`flower.${DOMAIN:-yourplatform.pl}`)"
+      - "traefik.http.routers.flower.entrypoints=websecure"
+      - "traefik.http.routers.flower.tls.certresolver=letsencrypt"
+      - "traefik.http.services.flower.loadbalancer.server.port=5555"
+      # Basic auth middleware
+      - "traefik.http.middlewares.flower-auth.basicauth.users=${FLOWER_BASIC_AUTH_TRAEFIK}"
+      - "traefik.http.routers.flower.middlewares=flower-auth"
+
+  nginx:
+    # In prod, Traefik handles SSL termination — nginx just proxies internally
+    ports: !reset []   # Remove all port bindings — Traefik handles external traffic
+    expose:
+      - "80"
+      - "8001"
+      - "5556"
+      - "8082"
+
+  postgres:
+    restart: always
+    ports: !reset []   # No direct DB access in prod
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  redis:
+    restart: always
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  adminer:
+    # Disable adminer in production (use Traefik-protected pgAdmin instead)
+    profiles:
+      - disabled
+
+volumes:
+  traefik_certs:
+    driver: local
