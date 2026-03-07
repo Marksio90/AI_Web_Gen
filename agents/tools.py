@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import ipaddress
 import json
+import socket
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -13,11 +15,36 @@ from agents import function_tool
 from config import settings
 
 
+def _is_safe_url(url: str) -> bool:
+    """Reject URLs pointing to internal/cloud metadata addresses (SSRF protection)."""
+    try:
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = parsed.hostname or ""
+        if not hostname:
+            return False
+        # Block well-known internal hostnames
+        blocked = {"localhost", "metadata.google.internal", "metadata.gce.internal"}
+        if hostname in blocked:
+            return False
+        # Resolve and check for private IPs
+        for info in socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM):
+            addr = ipaddress.ip_address(info[4][0])
+            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                return False
+        return True
+    except Exception:
+        return False
+
+
 @function_tool
 async def check_website_exists(url: str) -> dict:
     """Check if a URL is reachable and return basic HTTP info."""
     if not url:
         return {"reachable": False, "status_code": None, "redirect_url": None}
+    if not _is_safe_url(url):
+        return {"reachable": False, "error": "URL blocked by security policy"}
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=10) as client:
             resp = await client.head(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -36,6 +63,8 @@ async def get_pagespeed_score(url: str) -> dict:
     """Fetch PageSpeed Insights scores for mobile and desktop."""
     if not url:
         return {"error": "No URL provided"}
+    if not _is_safe_url(url):
+        return {"error": "URL blocked by security policy"}
     api_url = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
     results = {}
     async with httpx.AsyncClient(timeout=60) as client:
@@ -148,7 +177,7 @@ def generate_slug(business_name: str, city: str) -> str:
     text = re.sub(r"[^a-z0-9-]", "-", text)
     text = re.sub(r"-+", "-", text).strip("-")
     # Ensure uniqueness with short hash
-    hash_suffix = hashlib.md5(f"{business_name}{city}".encode()).hexdigest()[:4]
+    hash_suffix = hashlib.sha256(f"{business_name}{city}".encode()).hexdigest()[:6]
     return f"{text[:40]}-{hash_suffix}"
 
 
@@ -171,11 +200,15 @@ async def fetch_stock_images(category: str, count: int = 5) -> list[dict]:
     if not api_key:
         # Return placeholder structure when key not set
         return [{"url": f"https://picsum.photos/800/600?random={i}", "alt": query} for i in range(count)]
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.get(
             "https://api.pexels.com/v1/search",
             headers={"Authorization": api_key},
             params={"query": query, "per_page": count, "orientation": "landscape"},
         )
+        resp.raise_for_status()
         photos = resp.json().get("photos", [])
-        return [{"url": p["src"]["large"], "alt": p["alt"], "photographer": p["photographer"]} for p in photos]
+        return [
+            {"url": p.get("src", {}).get("large", ""), "alt": p.get("alt", ""), "photographer": p.get("photographer", "")}
+            for p in photos if p.get("src")
+        ]

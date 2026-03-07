@@ -25,6 +25,8 @@ out
 __tests__
 cypress
 playwright
+coverage
+.nyc_output
 
 # OS
 .DS_Store

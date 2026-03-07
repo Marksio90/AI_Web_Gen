@@ -68,12 +68,7 @@ celery_app.conf.update(
 
 def _run_async(coro):
     """Run async coroutine from sync Celery task."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    return asyncio.run(coro)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -160,7 +155,7 @@ def run_crawler(
         nonlocal total_discovered
         for city_name in cities:
             city_data = next((c for c in POLISH_CITIES if c[0].lower() == city_name.lower()), None)
-            lat, lng = city_data[1], city_data[2] if city_data else (52.2297, 21.0122)
+            (lat, lng) = (city_data[1], city_data[2]) if city_data else (52.2297, 21.0122)
 
             for category in categories:
                 discovered = []
@@ -190,13 +185,17 @@ def run_crawler(
                         unique.append(b)
 
                 # POST to platform API
+                api_secret = os.getenv("AGENT_API_SECRET", "")
+                auth_headers = {"Content-Type": "application/json"}
+                if api_secret:
+                    auth_headers["X-Api-Secret"] = api_secret
                 async with httpx.AsyncClient(timeout=30) as client:
                     for business in unique:
                         try:
                             await client.post(
                                 f"{platform_url}/api/leads",
                                 json=business,
-                                headers={"Content-Type": "application/json"},
+                                headers=auth_headers,
                             )
                             total_discovered += 1
                         except Exception as e:

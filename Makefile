@@ -53,7 +53,7 @@ help:
 	  $(MAKEFILE_LIST)
 	@printf "\n$(BOLD)$(WHITE)  QUICK EXAMPLES$(RESET)\n"
 	@printf "  $(DIM)make crawl CITY=Kraków CATEGORY=beauty_salon LIMIT=500$(RESET)\n"
-	@printf "  $(DIM)make logs-f agents$(RESET)\n"
+	@printf "  $(DIM)make logs-f SERVICE=agents$(RESET)\n"
 	@printf "  $(DIM)make db-backup$(RESET)\n"
 	@printf "  $(DIM)make scale-worker N=4$(RESET)\n"
 	@printf "\n"
@@ -69,9 +69,14 @@ prod: check-env ## 🏭 Start production stack (Traefik TLS, replicas, no hot re
 	$(call HEADER,Starting PROD Stack)
 	@./scripts/start.sh prod
 
-down: ## ⏹  Stop all services (data preserved)
+down: ## ⏹  Stop dev services (data preserved)
 	@printf "$(YELLOW)Stopping all services...$(RESET)\n"
 	@$(COMPOSE_DEV) down --remove-orphans
+	@printf "$(GREEN)✓ All services stopped$(RESET)\n"
+
+down-prod: ## ⏹  Stop production services (data preserved)
+	@printf "$(YELLOW)Stopping production services...$(RESET)\n"
+	@$(COMPOSE_PROD) down --remove-orphans
 	@printf "$(GREEN)✓ All services stopped$(RESET)\n"
 
 down-clean: ## 💣 Stop all services + delete ALL volumes (data loss!)
@@ -110,8 +115,8 @@ health: ## 🏥 Run full stack health check (HTTP + Docker + TCP)
 logs: ## 📜 Follow logs from ALL services (last 100 lines)
 	@$(COMPOSE_DEV) logs -f --tail=100
 
-logs-f: ## 📜 Follow logs from a specific service: make logs-f platform
-	@$(COMPOSE_DEV) logs -f --tail=200 $(filter-out $@,$(MAKECMDGOALS))
+logs-f: ## 📜 Follow logs from a specific service: make logs-f SERVICE=platform
+	@$(COMPOSE_DEV) logs -f --tail=200 $(SERVICE)
 
 stats: ## 📈 Live container resource usage (CPU/memory/network)
 	@docker stats --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
@@ -185,9 +190,9 @@ db-reset: ## 💣 Drop + recreate DB + re-seed (DEV ONLY — data loss!)
 	@$(MAKE) db-seed
 	@printf "$(GREEN)✓ Database reset and seeded$(RESET)\n"
 
-db-studio: ## 🎨 Open Prisma Studio (visual DB browser) at :5555
-	@printf "$(CYAN)Starting Prisma Studio at http://localhost:5555$(RESET)\n"
-	@$(COMPOSE_DEV) exec platform npx prisma studio --port 5555
+db-studio: ## 🎨 Open Prisma Studio (visual DB browser) at :5557
+	@printf "$(CYAN)Starting Prisma Studio at http://localhost:5557$(RESET)\n"
+	@$(COMPOSE_DEV) exec platform npx prisma studio --port 5557
 
 db-backup: ## 💾 Create timestamped DB backup in ./backups/
 	$(call HEADER,Database Backup)
@@ -251,7 +256,3 @@ check-env: ## ✅ Verify Docker + .env prerequisites
 	@command -v docker >/dev/null 2>&1 || (printf "$(RED)✗ Docker not found$(RESET)\n" && exit 1)
 	@docker info >/dev/null 2>&1 || (printf "$(RED)✗ Docker daemon not running$(RESET)\n" && exit 1)
 	@docker compose version >/dev/null 2>&1 || (printf "$(RED)✗ Docker Compose v2 required$(RESET)\n" && exit 1)
-
-# Catch-all to allow `make logs-f platform` without error
-%:
-	@true

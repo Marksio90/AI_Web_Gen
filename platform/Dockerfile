@@ -30,11 +30,11 @@ RUN npx prisma generate
 # Build Next.js standalone output
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-# Stub required env vars for build-time (runtime values come from docker-compose)
-ENV DATABASE_URL=postgresql://stub:stub@stub:5432/stub
-ENV AUTH_SECRET=build-stub-secret-not-used-at-runtime
-ENV STRIPE_SECRET_KEY=sk_test_stub
-ENV RESEND_API_KEY=re_stub
+# Stub required env vars for build-time only (not persisted in final image)
+ARG DATABASE_URL=postgresql://stub:stub@stub:5432/stub
+ARG AUTH_SECRET=build-stub-secret-not-used-at-runtime
+ARG STRIPE_SECRET_KEY=sk_test_stub
+ARG RESEND_API_KEY=re_stub
 RUN npm run build
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -188,12 +188,22 @@ class OSMCrawler:
     def __init__(self):
         self.client = httpx.AsyncClient(timeout=60)
 
+    @staticmethod
+    def _sanitize_city(city: str) -> str:
+        """Sanitize city name to prevent Overpass QL injection."""
+        import re
+        sanitized = re.sub(r'[^a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ\s\-]', '', city)
+        if not sanitized:
+            raise ValueError(f"Invalid city name after sanitization: {city!r}")
+        return sanitized
+
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=2, min=4, max=30))
     async def query(self, city: str, category: str, timeout: int = 30) -> list[dict]:
+        safe_city = self._sanitize_city(city)
         osm_tag = CATEGORY_OSM_TAGS.get(category, f'[shop={category}]')
         overpass_query = f"""
 [out:json][timeout:{timeout}];
-area["name"="{city}"]["boundary"="administrative"]["admin_level"~"^[67]$"]->.city;
+area["name"="{safe_city}"]["boundary"="administrative"]["admin_level"~"^[67]$"]->.city;
 (
   node{osm_tag}(area.city);
   way{osm_tag}(area.city);

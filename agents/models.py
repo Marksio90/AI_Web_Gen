@@ -1,11 +1,11 @@
 """Shared Pydantic models for inter-agent communication."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, HttpUrl, field_validator
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 
 
 class WebsiteStatus(str, Enum):
@@ -50,7 +50,7 @@ class BusinessData(BaseModel):
     review_count: Optional[int] = None
     opening_hours: Optional[dict] = None
     source: str = "google_maps"
-    discovered_at: datetime = datetime.utcnow()
+    discovered_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class SEOAnalysis(BaseModel):

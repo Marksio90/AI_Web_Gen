@@ -106,6 +106,13 @@ model Lead {
 
   activities Activity[]
   campaigns  CampaignLead[]
+
+  @@index([stage])
+  @@index([city])
+  @@index([category])
+  @@index([createdAt])
+  @@index([email])
+  @@index([stripeSubscriptionId])
 }
 
 model Activity {
@@ -117,6 +124,9 @@ model Activity {
   createdAt DateTime     @default(now())
 
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([createdAt])
 }
 
 model Campaign {
@@ -152,6 +162,8 @@ model CampaignLead {
   lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@unique([campaignId, leadId])
+  @@index([campaignId, sentAt])
+  @@index([leadId])
 }
 
 model UnsubscribeToken {
@@ -160,6 +172,8 @@ model UnsubscribeToken {
   email     String
   createdAt DateTime @default(now())
   usedAt    DateTime?
+
+  @@index([email])
 }
 
 // ─────────────────────────────────────────────────────────

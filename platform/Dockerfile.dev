@@ -11,6 +11,11 @@ RUN npm install
 COPY prisma ./prisma
 RUN npx prisma generate
 
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs && \
+    chown -R nextjs:nodejs /app
+USER nextjs
+
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=development
 ENV PORT=3000

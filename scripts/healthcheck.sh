@@ -49,6 +49,7 @@ check_docker postgres
 check_docker redis
 check_docker platform
 check_docker agents
+check_docker worker
 check_docker flower
 
 echo ""
@@ -59,6 +60,8 @@ check_http "Agent API health"     "http://localhost:8001/health"
 check_http "Agent API docs"       "http://localhost:8001/docs"
 check_http "Flower UI"            "http://localhost:5556"
 check_http "Adminer"              "http://localhost:8082"
+check_http "Prometheus"           "http://localhost:9090/-/ready"
+check_http "Grafana"              "http://localhost:3001/api/health"
 
 echo ""
 echo -e "${BOLD}━━━ TCP Connectivity ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

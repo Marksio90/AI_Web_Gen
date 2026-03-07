@@ -9,26 +9,30 @@ from __future__ import annotations
 
 import asyncio
 import os
+import warnings
 from typing import Optional
 
+import structlog
 from fastapi import FastAPI, HTTPException, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from config import settings
 from pipeline import process_business
 from models import ProcessedBusiness
 
+log = structlog.get_logger()
+
 app = FastAPI(
     title="AI Web Generator — Agent API",
     version="1.0.0",
-    docs_url="/docs",   # always enabled (nginx restricts access in prod)
+    docs_url="/docs" if os.getenv("ENV") != "production" else None,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://yourplatform.pl", "http://localhost:3000", "http://localhost"],
+    allow_origins=os.getenv("CORS_ORIGINS", "https://yourplatform.pl,http://localhost:3000,http://localhost").split(","),
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
@@ -73,8 +77,11 @@ class ProcessResponse(BaseModel):
 
 
 def _verify_secret(x_api_secret: Optional[str] = Header(None)) -> None:
-    expected = settings.__dict__.get("agent_api_secret") or os.getenv("AGENT_API_SECRET", "")
-    if expected and x_api_secret != expected:
+    expected = os.getenv("AGENT_API_SECRET")
+    if not expected:
+        warnings.warn("AGENT_API_SECRET not set — API endpoints are unauthenticated", stacklevel=2)
+        return
+    if not x_api_secret or x_api_secret != expected:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
@@ -83,13 +90,14 @@ async def health():
     """Health check — used by Docker + Nginx."""
     import redis.asyncio as aioredis
     redis_ok = False
+    r = aioredis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
     try:
-        r = aioredis.from_url(os.getenv("REDIS_URL", "redis://redis:6379/0"))
         await r.ping()
-        await r.aclose()
         redis_ok = True
     except Exception:
         pass
+    finally:
+        await r.aclose()
 
     status = "healthy" if redis_ok else "degraded"
     return {"status": status, "version": "1.0.0", "redis": redis_ok}
@@ -118,12 +126,25 @@ async def process(
             pipeline_duration_s=result.pipeline_duration_s,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        log.error("pipeline.error", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal processing error") from exc
 
 
 class BatchRequest(BaseModel):
     businesses: list[ProcessRequest]
     concurrency: int = 5
+
+    @field_validator("businesses")
+    @classmethod
+    def limit_batch_size(cls, v):
+        if len(v) > 500:
+            raise ValueError("Maximum 500 businesses per batch")
+        return v
+
+    @field_validator("concurrency")
+    @classmethod
+    def clamp_concurrency(cls, v):
+        return max(1, min(v, 20))
 
 
 class BatchJobResponse(BaseModel):

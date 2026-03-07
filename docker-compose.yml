@@ -35,8 +35,8 @@ x-python-env: &python-env
   GROQ_API_KEY: ${GROQ_API_KEY:-}
   GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY:-}
   PAGESPEED_API_KEY: ${PAGESPEED_API_KEY:-}
-  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aiwebgen}:${POSTGRES_PASSWORD:-securepass}@postgres:5432/${POSTGRES_DB:-ai_web_gen}
-  REDIS_URL: redis://redis:6379/0
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-aiwebgen}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}@postgres:5432/${POSTGRES_DB:-ai_web_gen}
+  REDIS_URL: redis://:${REDIS_PASSWORD:-changeme}@redis:6379/0
   PLATFORM_API_URL: http://platform:3000
   AGENT_API_SECRET: ${AGENT_API_SECRET:-dev-secret-change-in-prod}
   DEMO_BASE_DOMAIN: ${DEMO_BASE_DOMAIN:-demo.yourplatform.pl}
@@ -79,14 +79,14 @@ services:
     environment:
       <<: *common-env
       POSTGRES_USER: ${POSTGRES_USER:-aiwebgen}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-securepass}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}
       POSTGRES_DB: ${POSTGRES_DB:-ai_web_gen}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aiwebgen} -d ${POSTGRES_DB:-ai_web_gen}"]
       <<: *healthcheck-fast
@@ -113,12 +113,13 @@ services:
       --appendonly yes
       --appendfsync everysec
       --loglevel warning
+      --requirepass ${REDIS_PASSWORD:-changeme}
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-changeme}", "ping"]
       <<: *healthcheck-fast
       start_period: 5s
     networks:
@@ -141,12 +142,12 @@ services:
     container_name: aiwebgen-db-migrate
     restart: "no"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-aiwebgen}:${POSTGRES_PASSWORD:-securepass}@postgres:5432/${POSTGRES_DB:-ai_web_gen}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiwebgen}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}@postgres:5432/${POSTGRES_DB:-ai_web_gen}
       NODE_ENV: production
     command: >
       sh -c "
         echo '🔄 Running database migrations...' &&
-        until npx prisma db push --skip-generate --accept-data-loss; do
+        until npx prisma db push --skip-generate; do
           echo '⏳ DB not ready, retrying in 3s...' && sleep 3;
         done &&
         echo '✅ Schema applied!' &&
@@ -175,7 +176,7 @@ services:
       <<: *common-env
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-aiwebgen}:${POSTGRES_PASSWORD:-securepass}@postgres:5432/${POSTGRES_DB:-ai_web_gen}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aiwebgen}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}@postgres:5432/${POSTGRES_DB:-ai_web_gen}
       AUTH_SECRET: ${AUTH_SECRET:-insecure-dev-secret-change-me}
       AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
       AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
@@ -386,6 +387,32 @@ services:
   # OBSERVABILITY STACK
   ############################################################################
 
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: aiwebgen-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    expose:
+      - "9093"
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9093/-/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
   prometheus:
     image: prom/prometheus:v2.51.0
     container_name: aiwebgen-prometheus
@@ -396,14 +423,13 @@ services:
       - '--storage.tsdb.retention.time=15d'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
-      - '--web.enable-lifecycle'
       - '--log.level=warn'
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     networks:
       - monitoring
       - frontend     # scrapes platform, agents, nginx
@@ -487,6 +513,7 @@ services:
       - ./monitoring/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /var/log:/var/log:ro
+      - promtail_positions:/positions
     command: -config.file=/etc/promtail/promtail.yml
     depends_on:
       loki:
@@ -505,7 +532,7 @@ services:
     container_name: aiwebgen-postgres-exporter
     restart: unless-stopped
     environment:
-      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-aiwebgen}:${POSTGRES_PASSWORD:-securepass}@postgres:5432/${POSTGRES_DB:-ai_web_gen}?sslmode=disable
+      DATA_SOURCE_NAME: postgresql://${POSTGRES_USER:-aiwebgen}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required}@postgres:5432/${POSTGRES_DB:-ai_web_gen}?sslmode=disable
     expose:
       - "9187"
     depends_on:
@@ -515,6 +542,10 @@ services:
       - backend
       - monitoring
     logging: *logging
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   redis-exporter:
     image: oliver006/redis_exporter:v1.61.0
@@ -522,6 +553,7 @@ services:
     restart: unless-stopped
     environment:
       REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme}
     expose:
       - "9121"
     depends_on:
@@ -531,6 +563,10 @@ services:
       - backend
       - monitoring
     logging: *logging
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:v1.1.0
@@ -547,6 +583,10 @@ services:
       - frontend
       - monitoring
     logging: *logging
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   node-exporter:
     image: prom/node-exporter:v1.8.0
@@ -568,6 +608,10 @@ services:
       - monitoring
     pid: host
     logging: *logging
+    deploy:
+      resources:
+        limits:
+          memory: 128M
 
   ############################################################################
   # DEVELOPER TOOLS
@@ -636,6 +680,10 @@ volumes:
   grafana_data:
     driver: local
   loki_data:
+    driver: local
+  alertmanager_data:
+    driver: local
+  promtail_positions:
     driver: local
 
 ############################################################################

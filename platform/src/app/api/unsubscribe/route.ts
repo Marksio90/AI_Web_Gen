@@ -42,13 +42,20 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // Escape email to prevent XSS
+  const safeEmail = record.email
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
   return new NextResponse(
     `<!doctype html>
 <html lang="pl">
 <head><meta charset="UTF-8"><title>Wypisano z listy</title></head>
 <body style="font-family:Arial,sans-serif;max-width:500px;margin:80px auto;padding:20px;text-align:center;">
   <h1 style="color:#1a1a2e;">Wypisano pomyślnie</h1>
-  <p>Adres <strong>${record.email}</strong> został usunięty z naszej listy kontaktowej.</p>
+  <p>Adres <strong>${safeEmail}</strong> został usunięty z naszej listy kontaktowej.</p>
   <p style="color:#6b7280;font-size:14px;">Nie będziesz otrzymywać od nas więcej wiadomości.</p>
 </body>
 </html>`,

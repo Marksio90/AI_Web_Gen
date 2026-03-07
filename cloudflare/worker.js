@@ -13,7 +13,6 @@
  *   bucket_name = "demo-sites"
  */
 
-const PLATFORM_DOMAIN = "yourplatform.pl";
 const DEMO_SUBDOMAIN = "demo";
 
 const MIME_TYPES = {
@@ -34,8 +33,13 @@ const MIME_TYPES = {
   ".txt":   "text/plain",
 };
 
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 export default {
   async fetch(request, env) {
+    const PLATFORM_DOMAIN = env.PLATFORM_DOMAIN || "yourplatform.pl";
     const url = new URL(request.url);
     const hostname = url.hostname;
 
@@ -69,7 +73,7 @@ export default {
       // Try index.html fallback for SPA-style routing
       const fallback = await env.DEMO_SITES.get(`${slug}/index.html`);
       if (!fallback) {
-        return new Response(demoNotFoundPage(slug), {
+        return new Response(demoNotFoundPage(escapeHtml(slug), PLATFORM_DOMAIN), {
           status: 404,
           headers: { "Content-Type": "text/html; charset=utf-8" },
         });
@@ -88,7 +92,7 @@ function serveObject(object, pathname) {
   const headers = new Headers();
   headers.set("Content-Type", contentType);
   headers.set("Cache-Control", "public, max-age=3600");
-  headers.set("X-Powered-By", "AI Web Generator");
+  headers.set("X-Robots-Tag", "noindex, nofollow");
 
   // Security headers
   headers.set("X-Content-Type-Options", "nosniff");
@@ -102,13 +106,13 @@ function serveObject(object, pathname) {
   return new Response(object.body, { headers });
 }
 
-function demoNotFoundPage(slug) {
+function demoNotFoundPage(slug, platformDomain) {
   return `<!doctype html>
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Strona demo – w przygotowaniu</title>
+  <title>Strona demo \u2013 w przygotowaniu</title>
   <style>
     body { font-family: system-ui, sans-serif; background: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
     .card { background: white; border-radius: 16px; padding: 48px; text-align: center; max-width: 480px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); }
@@ -120,11 +124,11 @@ function demoNotFoundPage(slug) {
 </head>
 <body>
   <div class="card">
-    <p style="font-size:2.5rem;margin-bottom:16px">⚡</p>
+    <p style="font-size:2.5rem;margin-bottom:16px">\u26A1</p>
     <h1>Strona demo jest przygotowywana</h1>
-    <p>Demo dla <span class="slug">${slug}</span> jest właśnie generowane przez AI.<br>Spróbuj ponownie za chwilę.</p>
+    <p>Demo dla <span class="slug">${slug}</span> jest w\u0142a\u015Bnie generowane przez AI.<br>Spr\u00F3buj ponownie za chwil\u0119.</p>
     <p style="margin-top:24px">
-      <a href="https://${PLATFORM_DOMAIN}">Dowiedz się więcej o platformie →</a>
+      <a href="https://${platformDomain}">Dowiedz si\u0119 wi\u0119cej o platformie \u2192</a>
     </p>
   </div>
 </body>
