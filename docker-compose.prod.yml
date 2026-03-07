@@ -34,6 +34,11 @@ services:
       - traefik_certs:/letsencrypt
     networks:
       - frontend
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
     deploy:
       resources:
         limits:
@@ -84,6 +89,21 @@ services:
       traefik.http.routers.flower.entrypoints: "websecure"
       traefik.http.routers.flower.tls.certresolver: "letsencrypt"
       traefik.http.services.flower.loadbalancer.server.port: "5555"
+
+  # Lock down infrastructure ports in production
+  postgres:
+    ports: []
+
+  redis:
+    ports: []
+
+  prometheus:
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  grafana:
+    ports:
+      - "127.0.0.1:3001:3000"
 
   # Disable dev tools in production
   adminer:

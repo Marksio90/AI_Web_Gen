@@ -1,0 +1,37 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Dependencies (rebuilt in containers)
+node_modules
+platform/node_modules
+platform/.next
+templates/node_modules
+
+# Build artifacts
+dist
+*.log
+backups/
+
+# Monitoring data (don't ship to build context)
+monitoring/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# OS files
+.DS_Store
+Thumbs.db

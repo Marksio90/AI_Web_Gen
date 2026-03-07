@@ -79,7 +79,7 @@ wait_healthy() {
   local elapsed=0
   echo -n "  Waiting for $service..."
   while [ $elapsed -lt $max_wait ]; do
-    STATUS=$(docker compose $COMPOSE_FILES ps --format json "$service" 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('Health',''))" 2>/dev/null || echo "")
+    STATUS=$(docker inspect --format='{{.State.Health.Status}}' "aiwebgen-$service" 2>/dev/null || echo "")
     if [ "$STATUS" = "healthy" ]; then
       echo -e " ${GREEN}healthy${NC}"
       return 0
@@ -115,7 +115,7 @@ fi
 echo ""
 echo -e "  ${BOLD}Useful commands:${NC}"
 echo -e "  make logs       — follow all logs"
-echo -e "  make logs-f X  — follow service X logs"
+echo -e "  make logs-f SERVICE=X  — follow service X logs"
 echo -e "  make crawl      — run business discovery"
 echo -e "  make shell-platform  — Next.js shell"
 echo -e "  make shell-agents    — Python agent shell"

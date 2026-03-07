@@ -20,7 +20,7 @@ services:
 
   agents:
     build:
-      target: dev
+      target: runner
     environment:
       LOG_LEVEL: DEBUG
     volumes:
@@ -31,7 +31,7 @@ services:
 
   worker:
     build:
-      target: dev
+      target: runner
     environment:
       LOG_LEVEL: DEBUG
     volumes:

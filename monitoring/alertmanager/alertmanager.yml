@@ -1,0 +1,26 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default'
+
+receivers:
+  - name: 'default'
+    # Configure your notification channel here:
+    # webhook_configs:
+    #   - url: 'http://platform:3000/api/webhooks/alerts'
+    #     send_resolved: true
+    # email_configs:
+    #   - to: 'alerts@yourplatform.pl'
+    #     from: 'alertmanager@yourplatform.pl'
+
+inhibit_rules:
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal: ['alertname']
