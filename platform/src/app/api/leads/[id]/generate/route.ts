@@ -40,8 +40,8 @@ export async function POST(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    return NextResponse.json({ error: `Agent pipeline error: ${error}` }, { status: 500 });
+    console.error("Agent pipeline error:", await response.text().catch(() => "unreadable"));
+    return NextResponse.json({ error: "Site generation failed" }, { status: 500 });
   }
 
   const result = await response.json();

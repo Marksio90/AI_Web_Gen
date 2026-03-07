@@ -9,13 +9,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import time
 from typing import Optional
 
 import structlog
 import typer
 from agents import Runner
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from agents_def import (
     content_agent,
@@ -36,17 +37,28 @@ app = typer.Typer()
 # Cost estimation helpers
 # ---------------------------------------------------------------------------
 COST_PER_1M = {
-    "gpt-4.1-nano": {"input": 0.10, "output": 0.40},
-    "gpt-4.1-mini": {"input": 0.40, "output": 1.60},
-    "gpt-4.1":      {"input": 2.00, "output": 8.00},
+    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
+    "gpt-4o":      {"input": 2.50, "output": 10.00},
 }
-
-_total_cost_usd = 0.0
 
 
 def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
-    rates = COST_PER_1M.get(model, {"input": 2.0, "output": 8.0})
+    rates = COST_PER_1M.get(model, {"input": 2.5, "output": 10.0})
     return (input_tokens * rates["input"] + output_tokens * rates["output"]) / 1_000_000
+
+
+def _parse_agent_json(raw: str) -> dict:
+    """Parse JSON from agent output, stripping markdown code fences if present."""
+    text = raw.strip()
+    text = re.sub(r'^```(?:json)?\s*', '', text)
+    text = re.sub(r'\s*```$', '', text)
+    return json.loads(text)
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
+async def _run_agent(agent, prompt: str):
+    """Run an agent with automatic retry on transient failures."""
+    return await Runner.run(agent, prompt)
 
 
 # ---------------------------------------------------------------------------
@@ -60,23 +72,23 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
     try:
         # --- Step 1: Crawler Agent — extract & normalize data ---
         log.info("crawler.start", name=business_raw.get("name"))
-        crawl_result = await Runner.run(
+        crawl_result = await _run_agent(
             crawler_agent,
             f"Extract and classify this business data:\n{json.dumps(business_raw, ensure_ascii=False)}"
         )
-        business = BusinessData(**json.loads(crawl_result.final_output))
+        business = BusinessData(**_parse_agent_json(crawl_result.final_output))
         log.info("crawler.done", name=business.name, status=business.website_url)
 
         # --- Step 2: SEO Agent — analyze existing website (if any) ---
         if business.website_url:
             log.info("seo.start", url=business.website_url)
-            seo_result = await Runner.run(
+            seo_result = await _run_agent(
                 seo_agent,
                 f"Analyze website quality for: {business.name} ({business.category})\n"
                 f"URL: {business.website_url}\n"
                 f"Location: {business.city}, Poland"
             )
-            seo_analysis = json.loads(seo_result.final_output)
+            seo_analysis = _parse_agent_json(seo_result.final_output)
             seo_analysis["business_id"] = business.place_id
         else:
             # No website — instant lead
@@ -93,7 +105,7 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
 
         # --- Step 3: Design Agent — select template & style ---
         log.info("design.start", name=business.name)
-        design_result = await Runner.run(
+        design_result = await _run_agent(
             design_agent,
             f"Select design for:\n"
             f"Business: {business.name}\n"
@@ -101,7 +113,7 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
             f"City: {business.city}\n"
             f"SEO notes: {seo_analysis.get('analysis_notes', '')}"
         )
-        design_spec = json.loads(design_result.final_output)
+        design_spec = _parse_agent_json(design_result.final_output)
 
         # --- Step 4: Content Agent (with QC retry loop) ---
         content_prompt = (
@@ -121,8 +133,8 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
         content = None
         for attempt in range(settings.max_qc_retries):
             log.info("content.generate", name=business.name, attempt=attempt + 1)
-            content_result = await Runner.run(content_agent, content_prompt)
-            content = json.loads(content_result.final_output)
+            content_result = await _run_agent(content_agent, content_prompt)
+            content = _parse_agent_json(content_result.final_output)
             content["business_id"] = business.place_id
 
             # QC review
@@ -133,8 +145,8 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
                 f"Content: {json.dumps(content, ensure_ascii=False)}\n"
                 f"Iteration: {attempt + 1}"
             )
-            qc_result = await Runner.run(qc_agent, qc_input)
-            qc_data = json.loads(qc_result.final_output)
+            qc_result = await _run_agent(qc_agent, qc_input)
+            qc_data = _parse_agent_json(qc_result.final_output)
             qc_data["business_id"] = business.place_id
             qc_data["iteration"] = attempt + 1
 
@@ -172,7 +184,7 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
             demo_url = f"https://{slug}.{settings.demo_base_domain}"
 
             log.info("email.generate", name=business.name, email=recipient_email)
-            email_result = await Runner.run(
+            email_result = await _run_agent(
                 email_agent,
                 f"Generate 3 outreach email variants for:\n"
                 f"Business: {business.name}\n"
@@ -182,7 +194,7 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
                 f"Demo URL: {demo_url}\n"
                 f"Website status: {seo_analysis.get('website_status')}"
             )
-            outreach_data = json.loads(email_result.final_output)
+            outreach_data = _parse_agent_json(email_result.final_output)
             outreach_data["business_id"] = business.place_id
             outreach_data["recipient_email"] = recipient_email
             outreach_data["demo_url"] = demo_url
@@ -212,6 +224,7 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
 # ---------------------------------------------------------------------------
 async def process_batch(businesses: list[dict], concurrency: int = 5) -> list[ProcessedBusiness]:
     """Process multiple businesses with controlled concurrency."""
+    concurrency = max(1, min(concurrency, settings.max_concurrent_agents))
     semaphore = asyncio.Semaphore(concurrency)
     results = []
 

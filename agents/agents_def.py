@@ -2,12 +2,12 @@
 Six specialized agent definitions for the AI Website Generator pipeline.
 
 Agent hierarchy:
-  1. CrawlerAgent       (gpt-4.1-nano)   — classify & extract business data
-  2. SEOAgent           (gpt-4.1-mini)   — score existing website quality
-  3. DesignAgent        (gpt-4.1-mini)   — select template & color scheme
-  4. ContentAgent       (gpt-4.1 / Groq) — generate Polish website copy
-  5. EmailAgent         (gpt-4.1-mini)   — write PKE-compliant outreach
-  6. QCAgent            (gpt-4.1)        — quality gate with retry loop
+  1. CrawlerAgent       (gpt-4o-mini)    — classify & extract business data
+  2. SEOAgent           (gpt-4o-mini)    — score existing website quality
+  3. DesignAgent        (gpt-4o-mini)    — select template & color scheme
+  4. ContentAgent       (gpt-4o / Groq)  — generate Polish website copy
+  5. EmailAgent         (gpt-4o-mini)    — write PKE-compliant outreach
+  6. QCAgent            (gpt-4o)         — quality gate with retry loop
 """
 from agents import Agent
 
