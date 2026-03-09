@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
   try {
     switch (event.type) {
       case "checkout.session.completed": {
-        const session = event.data.object as Stripe.CheckoutSession;
+        const session = event.data.object as Stripe.Checkout.Session;
         const { leadId, plan } = session.metadata || {};
         if (!leadId) break;
 
