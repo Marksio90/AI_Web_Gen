@@ -569,7 +569,7 @@ services:
           memory: 128M
 
   nginx-exporter:
-    image: nginx/nginx-prometheus-exporter:v1.1.0
+    image: nginx/nginx-prometheus-exporter:1.1.0
     container_name: aiwebgen-nginx-exporter
     restart: unless-stopped
     command:
