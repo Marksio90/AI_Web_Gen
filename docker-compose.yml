@@ -509,6 +509,8 @@ services:
     image: grafana/promtail:3.0.0
     container_name: aiwebgen-promtail
     restart: unless-stopped
+    profiles:
+      - linux          # requires /var/run/docker.sock and /var/log — Linux only
     volumes:
       - ./monitoring/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -592,6 +594,8 @@ services:
     image: prom/node-exporter:v1.8.0
     container_name: aiwebgen-node-exporter
     restart: unless-stopped
+    profiles:
+      - linux          # requires host /proc, /sys, / mounts — Linux only
     command:
       - '--path.rootfs=/host'
       - '--path.procfs=/host/proc'
