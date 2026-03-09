@@ -27,7 +27,10 @@ from agents_def import (
     seo_agent,
 )
 from config import settings
-from models import BusinessData, ProcessedBusiness, WebsiteStatus
+from models import (
+    BusinessData, DesignSpec, GeneratedContent, OutreachEmail, ProcessedBusiness,
+    QCResult, SEOAnalysis, WebsiteStatus,
+)
 
 log = structlog.get_logger()
 app = typer.Typer()
@@ -37,8 +40,13 @@ app = typer.Typer()
 # Cost estimation helpers
 # ---------------------------------------------------------------------------
 COST_PER_1M = {
-    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
-    "gpt-4o":      {"input": 2.50, "output": 10.00},
+    "gpt-4o-mini":   {"input": 0.15,  "output": 0.60},
+    "gpt-4o":        {"input": 2.50,  "output": 10.00},
+    "gpt-4.1-mini":  {"input": 0.40,  "output": 1.60},
+    "gpt-4.1":       {"input": 2.00,  "output": 8.00},
+    "gpt-4.1-nano":  {"input": 0.10,  "output": 0.40},
+    # Groq models (approximate per-token pricing)
+    "llama-4-scout-17b-16e-instruct": {"input": 0.11, "output": 0.34},
 }
 
 
@@ -55,7 +63,11 @@ def _parse_agent_json(raw: str) -> dict:
     return json.loads(text)
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=30))
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=2, max=30),
+    retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+)
 async def _run_agent(agent, prompt: str):
     """Run an agent with automatic retry on transient failures."""
     return await Runner.run(agent, prompt)
@@ -88,18 +100,19 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
                 f"URL: {business.website_url}\n"
                 f"Location: {business.city}, Poland"
             )
-            seo_analysis = _parse_agent_json(seo_result.final_output)
-            seo_analysis["business_id"] = business.place_id
+            seo_raw = _parse_agent_json(seo_result.final_output)
+            seo_raw["business_id"] = business.place_id
+            seo_analysis = SEOAnalysis(**seo_raw)
         else:
             # No website — instant lead
-            seo_analysis = {
-                "business_id": business.place_id,
-                "website_status": WebsiteStatus.NONE,
-                "analysis_notes": "No website found — prime target for outreach",
-            }
+            seo_analysis = SEOAnalysis(
+                business_id=business.place_id,
+                website_status=WebsiteStatus.NONE,
+                analysis_notes="No website found — prime target for outreach",
+            )
 
         # Skip businesses with good websites
-        if seo_analysis.get("website_status") == WebsiteStatus.GOOD:
+        if seo_analysis.website_status == WebsiteStatus.GOOD:
             log.info("skip.good_website", name=business.name)
             return None
 
@@ -111,9 +124,9 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
             f"Business: {business.name}\n"
             f"Category: {business.category}\n"
             f"City: {business.city}\n"
-            f"SEO notes: {seo_analysis.get('analysis_notes', '')}"
+            f"SEO notes: {seo_analysis.analysis_notes}"
         )
-        design_spec = _parse_agent_json(design_result.final_output)
+        design_spec = DesignSpec(**_parse_agent_json(design_result.final_output))
 
         # --- Step 4: Content Agent (with QC retry loop) ---
         content_prompt = (
@@ -124,42 +137,45 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
             f"Adres: {business.address}\n"
             f"Telefon: {business.phone or 'brak'}\n"
             f"Ocena Google: {business.rating or 'brak'} ({business.review_count or 0} opinii)\n"
-            f"Szablon: {design_spec.get('template_id')}\n"
-            f"Styl: {design_spec.get('style_mood')}\n"
-            f"Sekcje: {', '.join(design_spec.get('sections', []))}"
+            f"Szablon: {design_spec.template_id}\n"
+            f"Styl: {design_spec.style_mood}\n"
+            f"Sekcje: {', '.join(design_spec.sections)}"
         )
 
         approved = False
-        content = None
+        content: Optional[GeneratedContent] = None
+        qc_data: Optional[QCResult] = None
         for attempt in range(settings.max_qc_retries):
             log.info("content.generate", name=business.name, attempt=attempt + 1)
             content_result = await _run_agent(content_agent, content_prompt)
-            content = _parse_agent_json(content_result.final_output)
-            content["business_id"] = business.place_id
+            content_raw = _parse_agent_json(content_result.final_output)
+            content_raw["business_id"] = business.place_id
+            content = GeneratedContent(**content_raw)
 
             # QC review
             qc_input = (
                 f"Review this generated website content:\n"
                 f"Business: {business.name} ({business.category}, {business.city})\n"
-                f"Design: {json.dumps(design_spec)}\n"
-                f"Content: {json.dumps(content, ensure_ascii=False)}\n"
+                f"Design: {design_spec.model_dump_json()}\n"
+                f"Content: {content.model_dump_json()}\n"
                 f"Iteration: {attempt + 1}"
             )
             qc_result = await _run_agent(qc_agent, qc_input)
-            qc_data = _parse_agent_json(qc_result.final_output)
-            qc_data["business_id"] = business.place_id
-            qc_data["iteration"] = attempt + 1
+            qc_raw = _parse_agent_json(qc_result.final_output)
+            qc_raw["business_id"] = business.place_id
+            qc_raw["iteration"] = attempt + 1
+            qc_data = QCResult(**qc_raw)
 
-            if qc_data.get("approved"):
-                log.info("qc.approved", name=business.name, score=qc_data.get("overall_score"))
+            if qc_data.approved:
+                log.info("qc.approved", name=business.name, score=qc_data.overall_score)
                 approved = True
                 break
             else:
-                log.warning("qc.revision", issues=qc_data.get("issues", []))
+                log.warning("qc.revision", issues=qc_data.issues)
                 # Feed issues back into next content prompt
                 content_prompt += (
                     f"\n\nPOPRAWKI (iteracja {attempt + 1}):\n"
-                    + "\n".join(f"- {i}" for i in qc_data.get("issues", []))
+                    + "\n".join(f"- {i}" for i in qc_data.issues)
                 )
 
         if not approved:
@@ -192,17 +208,21 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
                 f"City: {business.city}\n"
                 f"Recipient email: {recipient_email}\n"
                 f"Demo URL: {demo_url}\n"
-                f"Website status: {seo_analysis.get('website_status')}"
+                f"Website status: {seo_analysis.website_status.value}"
             )
-            outreach_data = _parse_agent_json(email_result.final_output)
-            outreach_data["business_id"] = business.place_id
-            outreach_data["recipient_email"] = recipient_email
-            outreach_data["demo_url"] = demo_url
+            outreach_raw = _parse_agent_json(email_result.final_output)
+            outreach_raw["business_id"] = business.place_id
+            outreach_raw["recipient_email"] = recipient_email
+            outreach_raw["demo_url"] = demo_url
+            outreach_email = OutreachEmail(**outreach_raw)
         else:
-            outreach_data = None
+            outreach_email = None
 
         duration = time.monotonic() - start
         log.info("pipeline.complete", name=business.name, duration_s=round(duration, 2))
+
+        from tools import generate_slug as _gen_slug
+        site_slug = _gen_slug(business.name, business.city)
 
         return ProcessedBusiness(
             business=business,
@@ -210,7 +230,9 @@ async def process_business(business_raw: dict) -> Optional[ProcessedBusiness]:
             design_spec=design_spec,
             content=content,
             qc_result=qc_data,
-            outreach_email=outreach_data,
+            outreach_email=outreach_email,
+            demo_site_slug=site_slug,
+            demo_site_url=f"https://{site_slug}.{settings.demo_base_domain}",
             pipeline_duration_s=round(duration, 2),
         )
 

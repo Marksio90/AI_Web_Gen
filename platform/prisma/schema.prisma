@@ -127,6 +127,7 @@ model Activity {
 
   @@index([leadId])
   @@index([createdAt])
+  @@index([type, createdAt])  // for filtered activity queries
 }
 
 model Campaign {
@@ -168,12 +169,13 @@ model CampaignLead {
 
 model UnsubscribeToken {
   id        String   @id @default(cuid())
-  token     String   @unique @default(cuid())
+  token     String   @unique @default(uuid())
   email     String
   createdAt DateTime @default(now())
   usedAt    DateTime?
 
   @@index([email])
+  @@index([createdAt])  // for cleanup of expired tokens
 }
 
 // ─────────────────────────────────────────────────────────

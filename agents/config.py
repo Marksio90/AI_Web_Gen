@@ -7,7 +7,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    # OpenAI models
+    # OpenAI models — defaults optimized for cost/quality balance
+    # Use gpt-4o-mini for simple classification tasks, gpt-4o for complex generation
     model_crawler: str = "gpt-4o-mini"
     model_seo: str = "gpt-4o-mini"
     model_content: str = "gpt-4o"
@@ -15,7 +16,7 @@ class Settings(BaseSettings):
     model_email: str = "gpt-4o-mini"
     model_qc: str = "gpt-4o"
 
-    # Groq fallback model (cost ~3-10x cheaper)
+    # Groq fallback model (cost ~3-10x cheaper for content generation)
     groq_model_content: str = "llama-4-scout-17b-16e-instruct"
     use_groq_for_content: bool = True
 
@@ -24,6 +25,7 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     google_maps_api_key: str = ""
     pagespeed_api_key: str = ""
+    pexels_api_key: str = ""
 
     # Database
     database_url: str = "postgresql+asyncpg://localhost/ai_web_gen"
@@ -38,10 +40,12 @@ class Settings(BaseSettings):
 
     # Pipeline limits
     max_qc_retries: int = 3
-    batch_size: int = 50  # Batch API batch size
+    batch_size: int = 50
     max_concurrent_agents: int = 10
 
+    # Operational
     log_level: str = "INFO"
+    env: str = "development"
 
 
 settings = Settings()

@@ -156,8 +156,73 @@ def get_industry_template(category: str) -> dict:
                 {"primary": "#1565C0", "secondary": "#E8F4FD", "accent": "#00ACC1"},
             ],
         },
+        "pharmacy": {
+            "templates": ["pharmacy-clean", "pharmacy-modern"],
+            "default_sections": ["hero", "services", "about", "products", "team", "contact"],
+            "color_palettes": [
+                {"primary": "#00695C", "secondary": "#E0F2F1", "accent": "#4DB6AC"},
+                {"primary": "#1565C0", "secondary": "#E3F2FD", "accent": "#42A5F5"},
+            ],
+        },
+        "hotel": {
+            "templates": ["hotel-luxury", "hotel-modern", "hotel-cozy"],
+            "default_sections": ["hero", "rooms", "about", "amenities", "gallery", "testimonials", "booking-cta", "contact"],
+            "color_palettes": [
+                {"primary": "#1A237E", "secondary": "#F5F5F0", "accent": "#C9A84C"},
+                {"primary": "#3E2723", "secondary": "#FFF8E1", "accent": "#FF8F00"},
+            ],
+        },
+        "bakery": {
+            "templates": ["bakery-warm", "bakery-artisan"],
+            "default_sections": ["hero", "products", "about", "gallery", "testimonials", "contact"],
+            "color_palettes": [
+                {"primary": "#5D4037", "secondary": "#FFF8E1", "accent": "#F9A825"},
+                {"primary": "#BF360C", "secondary": "#FBE9E7", "accent": "#FF8A65"},
+            ],
+        },
+        "florist": {
+            "templates": ["florist-elegant", "florist-fresh"],
+            "default_sections": ["hero", "services", "gallery", "about", "testimonials", "contact"],
+            "color_palettes": [
+                {"primary": "#2E7D32", "secondary": "#F1F8E9", "accent": "#E91E63"},
+                {"primary": "#880E4F", "secondary": "#FCE4EC", "accent": "#4CAF50"},
+            ],
+        },
+        "accountant": {
+            "templates": ["accountant-professional", "accountant-modern"],
+            "default_sections": ["hero", "services", "about", "process", "testimonials", "faq", "contact"],
+            "color_palettes": [
+                {"primary": "#263238", "secondary": "#ECEFF1", "accent": "#00897B"},
+                {"primary": "#1A237E", "secondary": "#E8EAF6", "accent": "#3F51B5"},
+            ],
+        },
+        "physiotherapy": {
+            "templates": ["physio-wellness", "physio-modern"],
+            "default_sections": ["hero", "services", "about", "team", "testimonials", "booking-cta", "contact"],
+            "color_palettes": [
+                {"primary": "#00695C", "secondary": "#E0F2F1", "accent": "#26A69A"},
+                {"primary": "#1565C0", "secondary": "#E3F2FD", "accent": "#29B6F6"},
+            ],
+        },
+        "optician": {
+            "templates": ["optician-modern", "optician-premium"],
+            "default_sections": ["hero", "services", "brands", "about", "team", "testimonials", "contact"],
+            "color_palettes": [
+                {"primary": "#37474F", "secondary": "#ECEFF1", "accent": "#00ACC1"},
+                {"primary": "#1B5E20", "secondary": "#E8F5E9", "accent": "#66BB6A"},
+            ],
+        },
     }
-    return templates.get(category, templates["restaurant"])
+    # Fallback: use a generic professional template for unknown categories
+    default_template = {
+        "templates": ["generic-professional", "generic-modern"],
+        "default_sections": ["hero", "services", "about", "testimonials", "contact"],
+        "color_palettes": [
+            {"primary": "#1A1A2E", "secondary": "#F5F5F5", "accent": "#6366F1"},
+            {"primary": "#2D3436", "secondary": "#FAFAFA", "accent": "#0984E3"},
+        ],
+    }
+    return templates.get(category, default_template)
 
 
 @function_tool
@@ -192,6 +257,13 @@ async def fetch_stock_images(category: str, count: int = 5) -> list[dict]:
         "law_office": "law office professional interior",
         "plumber": "plumbing professional tools",
         "fitness": "gym fitness workout interior",
+        "pharmacy": "pharmacy drugstore modern interior",
+        "hotel": "hotel room luxury interior",
+        "bakery": "bakery bread pastry artisan",
+        "florist": "flower shop florist bouquet",
+        "accountant": "office accounting professional business",
+        "physiotherapy": "physiotherapy clinic rehabilitation",
+        "optician": "optician eyeglasses shop modern",
     }
     query = category_queries.get(category, "small business professional")
     # Pexels API — requires PEXELS_API_KEY in env (free tier: 200 requests/hour)

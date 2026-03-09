@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 interface Lead {
   id: string;
@@ -19,6 +19,13 @@ interface Lead {
   outreachSentAt?: string;
   lastActivityAt?: string;
   createdAt: string;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
 }
 
 const STAGE_LABELS: Record<string, { label: string; color: string }> = {
@@ -43,42 +50,64 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, pages: 0 });
   const [search, setSearch] = useState("");
   const [stage, setStage] = useState("");
   const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const router = useRouter();
 
-  const fetchLeads = useCallback(async () => {
+  const fetchLeads = useCallback(async (page = 1) => {
+    // Cancel previous request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setLoading(true);
+    setError(null);
+
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (stage) params.set("stage", stage);
+    params.set("page", String(page));
     params.set("limit", "50");
 
-    const resp = await fetch(`/api/leads?${params}`);
-    const data = await resp.json();
-    setLeads(data.leads || []);
-    setTotal(data.pagination?.total || 0);
-    setLoading(false);
+    try {
+      const resp = await fetch(`/api/leads?${params}`, { signal: controller.signal });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      setLeads(data.leads || []);
+      setPagination(data.pagination || { page: 1, limit: 50, total: 0, pages: 0 });
+    } catch (err) {
+      if (err instanceof Error && err.name !== "AbortError") {
+        setError(err.message);
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [search, stage]);
 
-  useState(() => {
+  useEffect(() => {
     fetchLeads();
-  });
+    return () => abortRef.current?.abort();
+  }, [fetchLeads]);
 
   async function handleGenerate(leadId: string) {
+    if (generatingId) return;
     setGeneratingId(leadId);
     try {
       const resp = await fetch(`/api/leads/${leadId}/generate`, { method: "POST" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       if (data.success) {
-        alert(`Strona wygenerowana: ${data.demoSiteUrl}`);
-        fetchLeads();
+        fetchLeads(pagination.page);
       } else {
-        alert(`Błąd: ${data.error}`);
+        setError(`Generowanie nie powiodlo sie: ${data.error}`);
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Blad generowania");
     } finally {
       setGeneratingId(null);
     }
@@ -89,7 +118,7 @@ export default function LeadsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Leady</h1>
-          <p className="text-gray-500 mt-1">{total.toLocaleString("pl")} firm w bazie</p>
+          <p className="text-gray-500 mt-1">{pagination.total.toLocaleString("pl")} firm w bazie</p>
         </div>
         <button
           onClick={() => router.push("/dashboard/campaigns/new")}
@@ -98,6 +127,14 @@ export default function LeadsPage() {
           + Nowa kampania
         </button>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between">
+          <p className="text-red-700 text-sm">{error}</p>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 text-sm">Zamknij</button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-3 mb-6">
@@ -111,7 +148,7 @@ export default function LeadsPage() {
         />
         <select
           value={stage}
-          onChange={(e) => { setStage(e.target.value); fetchLeads(); }}
+          onChange={(e) => setStage(e.target.value)}
           className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           <option value="">Wszystkie etapy</option>
@@ -120,7 +157,7 @@ export default function LeadsPage() {
           ))}
         </select>
         <button
-          onClick={fetchLeads}
+          onClick={() => fetchLeads()}
           className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
         >
           Filtruj
@@ -182,16 +219,16 @@ export default function LeadsPage() {
                               rel="noopener noreferrer"
                               className="text-indigo-600 hover:underline text-xs"
                             >
-                              Demo →
+                              Demo
                             </a>
-                            {lead.qcScore && (
+                            {lead.qcScore != null && (
                               <span className={`text-xs font-medium ${lead.qcScore >= 75 ? "text-green-600" : "text-amber-600"}`}>
                                 {lead.qcScore}/100
                               </span>
                             )}
                           </div>
                         ) : (
-                          <span className="text-gray-400 text-xs">—</span>
+                          <span className="text-gray-400 text-xs">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
@@ -202,14 +239,14 @@ export default function LeadsPage() {
                               disabled={generatingId === lead.id}
                               className="px-3 py-1 bg-indigo-600 text-white rounded text-xs font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                             >
-                              {generatingId === lead.id ? "..." : "Generuj"}
+                              {generatingId === lead.id ? "Generuje..." : "Generuj"}
                             </button>
                           )}
                           <button
                             onClick={() => router.push(`/dashboard/leads/${lead.id}`)}
                             className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium hover:bg-gray-200 transition-colors"
                           >
-                            Szczegóły
+                            Szczegoly
                           </button>
                         </div>
                       </td>
@@ -219,14 +256,39 @@ export default function LeadsPage() {
               </tbody>
             </table>
 
-            {leads.length === 0 && (
+            {leads.length === 0 && !error && (
               <div className="text-center py-12 text-gray-400">
-                Brak leadów. Uruchom crawler aby znaleźć firmy.
+                Brak leadow. Uruchom crawler aby znalezc firmy.
               </div>
             )}
           </div>
         )}
       </div>
+
+      {/* Pagination controls */}
+      {pagination.pages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          <p className="text-sm text-gray-500">
+            Strona {pagination.page} z {pagination.pages}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => fetchLeads(pagination.page - 1)}
+              disabled={pagination.page <= 1}
+              className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm font-medium hover:bg-gray-200 disabled:opacity-50 transition-colors"
+            >
+              Poprzednia
+            </button>
+            <button
+              onClick={() => fetchLeads(pagination.page + 1)}
+              disabled={pagination.page >= pagination.pages}
+              className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm font-medium hover:bg-gray-200 disabled:opacity-50 transition-colors"
+            >
+              Nastepna
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

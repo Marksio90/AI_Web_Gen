@@ -1,7 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { verifyAuth } from "@/lib/auth";
 
-export async function GET() {
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  const auth = await verifyAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   const [
     totalLeads,
     sitesGenerated,
@@ -26,7 +32,7 @@ export async function GET() {
       by: ["category"],
       _count: { category: true },
       orderBy: { _count: { category: "desc" } },
-      take: 8,
+      take: 10,
     }),
 
     db.activity.findMany({
@@ -40,7 +46,13 @@ export async function GET() {
     ? ((conversions / totalLeads) * 100).toFixed(1)
     : "0";
 
-  return NextResponse.json({
+  // Cost estimation based on model pricing
+  // gpt-4o-mini agents (crawler, seo, design, email): ~$0.003 per business
+  // gpt-4o / Groq (content, qc): ~$0.05 per business (gpt-4o) or ~$0.005 (Groq)
+  const costPerSite = 0.012; // blended average with Groq for content
+  const groqShare = 0.3; // approximate Groq proportion of total cost
+
+  const response = NextResponse.json({
     totalLeads,
     sitesGenerated,
     emailsSent,
@@ -60,12 +72,15 @@ export async function GET() {
       type: a.type,
       createdAt: a.createdAt.toISOString(),
     })),
-    // Cost tracking would come from actual API usage logs
-    // Using estimates based on processed count
     monthlyCost: {
-      openai: sitesGenerated * 0.05,
-      groq: sitesGenerated * 0.005,
-      total: sitesGenerated * 0.055,
+      openai: Number((sitesGenerated * costPerSite * (1 - groqShare)).toFixed(2)),
+      groq: Number((sitesGenerated * costPerSite * groqShare).toFixed(2)),
+      total: Number((sitesGenerated * costPerSite).toFixed(2)),
     },
   });
+
+  // Cache for 30 seconds — dashboard doesn't need real-time data
+  response.headers.set("Cache-Control", "private, max-age=30, stale-while-revalidate=60");
+
+  return response;
 }

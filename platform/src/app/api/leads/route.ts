@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { verifyAuth } from "@/lib/auth";
 import { z } from "zod";
 
 const LeadFilterSchema = z.object({
@@ -23,11 +24,11 @@ export async function GET(request: NextRequest) {
   const { stage, category, city, websiteStatus, search, page, limit } = filters.data;
   const skip = (page - 1) * limit;
 
-  const where = {
-    ...(stage && { stage: stage as never }),
-    ...(category && { category: category as never }),
+  const where: Record<string, unknown> = {
+    ...(stage && { stage }),
+    ...(category && { category }),
     ...(city && { city: { contains: city, mode: "insensitive" as const } }),
-    ...(websiteStatus && { websiteStatus: websiteStatus as never }),
+    ...(websiteStatus && { websiteStatus }),
     ...(search && {
       OR: [
         { name: { contains: search, mode: "insensitive" as const } },
@@ -76,21 +77,25 @@ export async function GET(request: NextRequest) {
 }
 
 const CreateLeadSchema = z.object({
-  placeId: z.string(),
-  name: z.string().min(1),
-  address: z.string(),
-  city: z.string(),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
-  websiteUrl: z.string().url().optional(),
-  category: z.string().optional(),
-  googleMapsUrl: z.string().optional(),
-  rating: z.number().optional(),
-  reviewCount: z.number().optional(),
-  source: z.string().default("google_maps"),
+  placeId: z.string().min(1).max(500),
+  name: z.string().min(1).max(300),
+  address: z.string().max(500),
+  city: z.string().min(1).max(100),
+  phone: z.string().max(30).optional(),
+  email: z.string().email().max(254).optional(),
+  websiteUrl: z.string().url().max(2048).optional(),
+  category: z.string().max(50).optional(),
+  googleMapsUrl: z.string().url().max(2048).optional(),
+  rating: z.number().min(0).max(5).optional(),
+  reviewCount: z.number().int().min(0).max(1_000_000).optional(),
+  source: z.string().max(50).default("google_maps"),
 });
 
 export async function POST(request: NextRequest) {
+  // POST requires auth (dashboard or internal service)
+  const auth = await verifyAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   let body: unknown;
   try {
     body = await request.json();
@@ -108,7 +113,7 @@ export async function POST(request: NextRequest) {
     where: { placeId: data.data.placeId },
     create: {
       ...data.data,
-      category: (data.data.category as never) || "OTHER",
+      category: (data.data.category?.toUpperCase() as "RESTAURANT" | "OTHER") || "OTHER",
     },
     update: {
       // Update contact info if we got better data

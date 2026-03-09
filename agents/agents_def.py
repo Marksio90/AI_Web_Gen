@@ -101,10 +101,17 @@ Return a complete DesignSpec JSON object. Be specific with hex colors.
 
 # ---------------------------------------------------------------------------
 # 4. Content Generation Agent
+#    Uses Groq (Llama) when use_groq_for_content=True for ~3-10x cost savings
 # ---------------------------------------------------------------------------
+_content_model = (
+    settings.groq_model_content
+    if settings.use_groq_for_content and settings.groq_api_key
+    else settings.model_content
+)
+
 content_agent = Agent(
     name="Content Writer PL",
-    model=settings.model_content,
+    model=_content_model,
     instructions="""
 Jesteś doświadczonym copywriterem specjalizującym się w polskich stronach internetowych
 dla małych firm. Na podstawie danych firmy generujesz kompletne treści strony w języku

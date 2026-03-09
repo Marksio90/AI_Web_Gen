@@ -8,9 +8,10 @@ import { db } from "@/lib/db";
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const lead = await db.lead.findUnique({ where: { id: params.id } });
+  const { id } = await params;
+  const lead = await db.lead.findUnique({ where: { id } });
   if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
 
   if (lead.stage === "SITE_GENERATED" || lead.stage === "OUTREACH_SENT") {
@@ -48,7 +49,7 @@ export async function POST(
 
   // Update lead with generated content
   await db.lead.update({
-    where: { id: params.id },
+    where: { id: id },
     data: {
       stage: "SITE_GENERATED",
       demoSiteSlug: result.demo_site_slug,
@@ -62,7 +63,7 @@ export async function POST(
 
   await db.activity.create({
     data: {
-      leadId: params.id,
+      leadId: id,
       type: "SITE_GENERATED",
       metadata: {
         demoSiteUrl: result.demo_site_url,

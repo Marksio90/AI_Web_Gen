@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
             ]);
             emit({ type: "stats", total, generated, outreach, converted, ts: Date.now() });
           } catch { /* DB error — skip */ }
-        }, 5_000);
+        }, 10_000);
 
         emit({ type: "connected", message: "Streaming system stats every 5s" });
         return;
@@ -86,6 +86,7 @@ export async function GET(request: NextRequest) {
 
       emit({ type: "connected", leadId, message: "Tracking pipeline progress..." });
 
+      // Poll every 3s (was 2s) — reduces DB load while keeping UI responsive
       pollInterval = setInterval(async () => {
         try {
           const lead = await db.lead.findUnique({
@@ -129,7 +130,7 @@ export async function GET(request: NextRequest) {
             }
           }
         } catch { /* transient DB error — continue polling */ }
-      }, 2_000);
+      }, 3_000);
     },
 
     cancel() {
