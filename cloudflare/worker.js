@@ -96,8 +96,10 @@ function serveObject(object, pathname) {
 
   // Security headers
   headers.set("X-Content-Type-Options", "nosniff");
-  headers.set("X-Frame-Options", "SAMEORIGIN");
+  headers.set("X-Frame-Options", "DENY");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  headers.set("Content-Security-Policy", "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; script-src 'self'");
+  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
 
   if (object.httpMetadata?.contentType) {
     headers.set("Content-Type", object.httpMetadata.contentType);

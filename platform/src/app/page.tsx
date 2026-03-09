@@ -128,7 +128,7 @@ export default function HomePage() {
       </section>
 
       <footer className="max-w-7xl mx-auto px-6 py-8 border-t border-white/10 flex justify-between text-slate-500 text-sm">
-        <p>© 2025 AI Web Generator. Wszystkie prawa zastrzeżone.</p>
+        <p>&copy; {new Date().getFullYear()} AI Web Generator. Wszystkie prawa zastrzeżone.</p>
         <div className="flex gap-6">
           <Link href="/privacy" className="hover:text-slate-300">Prywatność</Link>
           <Link href="/terms" className="hover:text-slate-300">Regulamin</Link>
