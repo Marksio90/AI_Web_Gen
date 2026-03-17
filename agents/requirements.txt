@@ -1,23 +1,46 @@
+# Core AI & Agent Framework
 openai-agents==0.0.10
 openai>=1.68.0
 groq>=0.18.0
+
+# Data Validation & Configuration
 pydantic>=2.10.0
 pydantic-settings>=2.8.0
 python-dotenv>=1.0.0
+
+# HTTP Client
 httpx>=0.28.0
+
+# Database
 asyncpg>=0.30.0
 sqlalchemy[asyncio]>=2.0.0
 alembic>=1.14.0
+
+# Resilience & Retry
 tenacity>=9.0.0
+
+# Logging & CLI
 structlog>=25.1.0
 rich>=13.9.0
 typer>=0.15.0
+
+# Templating
 jinja2>=3.1.0
+
+# Web Framework
 fastapi>=0.115.0
 uvicorn[standard]>=0.34.0
 python-multipart>=0.0.20
+
+# Task Queue
 celery[redis]>=5.4.0
 flower>=2.0.0
+
+# Cache & Pub/Sub
 redis>=5.2.0
+
+# Web Scraping & Content Analysis
 beautifulsoup4>=4.12.0
+
+# Observability
 prometheus-fastapi-instrumentator>=7.0.0

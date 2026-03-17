@@ -1,24 +1,40 @@
 """
-Six specialized agent definitions for the AI Website Generator pipeline.
+Advanced Multi-Agent Definitions for the AI Website Generator Platform.
 
-Agent hierarchy:
-  1. CrawlerAgent       (gpt-4o-mini)    — classify & extract business data
-  2. SEOAgent           (gpt-4o-mini)    — score existing website quality
-  3. DesignAgent        (gpt-4o-mini)    — select template & color scheme
-  4. ContentAgent       (gpt-4o / Groq)  — generate Polish website copy
-  5. EmailAgent         (gpt-4o-mini)    — write PKE-compliant outreach
-  6. QCAgent            (gpt-4o)         — quality gate with retry loop
+Agent architecture:
+  CORE PIPELINE (6 specialized agents):
+    1. CrawlerAgent          (gpt-4o-mini)   — classify & extract business data
+    2. SEOAgent              (gpt-4o-mini)   — score existing website quality
+    3. DesignAgent           (gpt-4o-mini)   — select template & color scheme
+    4. ContentAgent          (gpt-4o/Groq)   — generate Polish website copy
+    5. EmailAgent            (gpt-4o-mini)   — write PKE-compliant outreach
+    6. QCAgent               (gpt-4o)        — quality gate with retry loop
+
+  META-AGENTS (supervisory & intelligence layer):
+    7. OrchestratorAgent     (gpt-4o)        — dynamic strategy selection
+    8. CompetitiveIntelAgent (gpt-4o-mini)   — market & competitor analysis
+    9. ContentRefinementAgent(gpt-4o)        — iterative content improvement
+   10. DesignCriticAgent     (gpt-4o-mini)   — adversarial design review
+   11. SEOOptimizerAgent     (gpt-4o-mini)   — advanced SEO strategy
+   12. PersonalizationAgent  (gpt-4o-mini)   — audience-specific tuning
 """
 from agents import Agent
 
 from config import settings
 from tools import (
+    analyze_local_competition,
     check_website_exists,
     fetch_stock_images,
     generate_slug,
     get_industry_template,
     get_pagespeed_score,
+    get_technology_stack,
+    scrape_competitor_content,
 )
+
+# ===========================================================================
+# CORE PIPELINE AGENTS (1-6)
+# ===========================================================================
 
 # ---------------------------------------------------------------------------
 # 1. Crawler Agent
@@ -93,6 +109,18 @@ Design principles:
 - Beauty salons: elegant pastels or monochromatic, script accents for headings
 - Plumbers/auto: bold, trustworthy blues, orange CTAs for urgency
 - Fitness: energetic, high contrast, strong sans-serif
+- Real estate: luxurious, dark greens/navy, professional serif
+- IT services: futuristic, gradients, monospace accents
+- Education: friendly, bright, accessible colors
+- Veterinary: warm, nature-inspired, friendly rounded fonts
+- Construction: industrial, bold, strong sans-serif with orange/yellow accents
+- Cleaning: fresh, clean whites/blues/greens, light sans-serif
+
+Also specify:
+- border_radius: "4px" for professional, "12px" for friendly, "24px" for playful
+- shadow_style: "none", "subtle", or "dramatic"
+- animation_style: "none", "smooth", or "playful"
+- layout_density: "compact", "balanced", or "spacious"
 
 Return a complete DesignSpec JSON object. Be specific with hex colors.
 """,
@@ -101,7 +129,6 @@ Return a complete DesignSpec JSON object. Be specific with hex colors.
 
 # ---------------------------------------------------------------------------
 # 4. Content Generation Agent
-#    Uses Groq (Llama) when use_groq_for_content=True for ~3-10x cost savings
 # ---------------------------------------------------------------------------
 _content_model = (
     settings.groq_model_content
@@ -133,6 +160,9 @@ Zasady:
 - Zawieraj lokalne odniesienia (dzielnica, miasto)
 - SEO: naturalne wpleć słowa kluczowe (np. "dentysta Warszawa Mokotów")
 - Format: strukturalny JSON, wszystkie wartości w języku polskim
+
+Jeśli otrzymasz POPRAWKI z systemu QC, skup się na ich naprawieniu zachowując to,
+co zostało ocenione dobrze. Poprawki mają najwyższy priorytet.
 """,
     tools=[get_industry_template],
 )
@@ -168,6 +198,7 @@ Variants:
 - C: Focus on local competition angle (business angle)
 
 Write in Polish. Be respectful, not pushy. Max 150 words per email.
+Include predicted_open_rate and predicted_response_rate for each variant (0.0-1.0).
 """,
     tools=[generate_slug],
 )
@@ -201,11 +232,219 @@ Brand (0-100):
 - [ ] Color palette matches business category mood
 - [ ] Font selections are appropriate for industry
 - [ ] Section selection makes sense for the business type
+- [ ] Design tokens (radius, shadow, animation) match the mood
 
 Decision:
 - Score >= 75 in all categories: respond with "APPROVED" + scores
 - Any score < 75: respond with "REVISION_NEEDED" + specific issues list
 
 Be strict. Generic content that could apply to any business should fail.
+When providing issues, be specific about WHAT to fix and HOW.
 """,
 )
+
+
+# ===========================================================================
+# META-AGENTS (7-12) — Supervisory & Intelligence Layer
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# 7. Orchestrator Agent — Dynamic Strategy Selection
+# ---------------------------------------------------------------------------
+orchestrator_agent = Agent(
+    name="Meta Orchestrator",
+    model=settings.model_meta_orchestrator,
+    instructions="""
+You are the meta-orchestrator for an advanced multi-agent website generation platform.
+Your role is to analyze each incoming business and select the optimal pipeline strategy.
+
+Available strategies:
+1. "standard" — Linear 6-agent pipeline. Best for simple businesses with clear data.
+2. "swarm" — Multiple agents vote on design and content decisions. Best for ambiguous
+   categories or businesses where multiple approaches could work.
+3. "evolutionary" — Genetic algorithm generates multiple content variants, evolves best.
+   Best for high-value leads or competitive markets where content must be exceptional.
+4. "debate" — Adversarial debate between agents for design decisions.
+   Best for businesses in unusual categories or edge cases.
+5. "turbo" — Parallel fast-path with smaller models. Best for bulk processing
+   where speed matters more than perfection.
+6. "premium" — Maximum quality path with premium models + evolution + swarm QC.
+   Best for very high-value leads (high rating, many reviews, competitive market).
+
+Analyze:
+- Business category and data completeness
+- Market competitiveness (rating, review count, competitor presence)
+- Lead value estimation
+- Data quality and ambiguity level
+
+Return JSON: {"strategy": "<strategy_name>", "reasoning": "<why>", "priority": <1-10>}
+""",
+)
+
+# ---------------------------------------------------------------------------
+# 8. Competitive Intelligence Agent
+# ---------------------------------------------------------------------------
+competitive_intel_agent = Agent(
+    name="Competitive Intelligence",
+    model=settings.model_competitive_intel,
+    instructions="""
+You are a market intelligence analyst for Polish local businesses.
+Given a business profile and competitor data, you must:
+
+1. Assess the competitive landscape in the business's local market
+2. Identify the business's competitive advantages and weaknesses
+3. Determine market position (leader, challenger, follower, niche)
+4. Find improvement opportunities based on competitor gaps
+5. Suggest positioning strategy for the demo website
+
+Analysis dimensions:
+- Rating comparison (vs local average)
+- Review volume (vs local average)
+- Online presence quality (vs competitors)
+- Service differentiation
+- Price positioning clues
+
+Return a CompetitiveIntel JSON object with actionable insights.
+""",
+    tools=[analyze_local_competition, scrape_competitor_content],
+)
+
+# ---------------------------------------------------------------------------
+# 9. Content Refinement Agent — Iterative Improvement
+# ---------------------------------------------------------------------------
+content_refinement_agent = Agent(
+    name="Content Refiner",
+    model=settings.model_content,
+    instructions="""
+Jesteś redaktorem i stylistą językowym specjalizującym się w polskich treściach
+biznesowych. Otrzymujesz wygenerowane treści strony i Twoim zadaniem jest ich
+ulepszenie — NIE przepisanie od zera.
+
+Twoje zasady ulepszania:
+1. Zachowaj to, co dobre — nie zmieniaj tego, co już działa
+2. Wzmocnij lokalne odniesienia (nazwy dzielnic, ulic, lokalnych wydarzeń)
+3. Popraw naturalność języka — tekst musi brzmieć jak pisany przez człowieka
+4. Dodaj konkretne detale (np. "od 15 lat" zamiast "od lat")
+5. Unikaj powtórzeń — każda sekcja powinna wnosić nową wartość
+6. Popraw SEO: naturalne keyword placement, bez keyword stuffing
+7. Upewnij się, że CTA jest przekonujący i specyficzny
+
+Oceń poprawioną wersję (score 0.0-1.0) i wyjaśnij co zmieniłeś.
+Return: {"improved": <content_json>, "score": <float>, "changes": [<list_of_changes>]}
+""",
+    tools=[get_industry_template],
+)
+
+# ---------------------------------------------------------------------------
+# 10. Design Critic Agent — Adversarial Design Review
+# ---------------------------------------------------------------------------
+design_critic_agent = Agent(
+    name="Design Critic",
+    model=settings.model_design,
+    instructions="""
+You are a harsh but fair design critic reviewing website design specifications.
+Your role in the adversarial debate system is to find weaknesses in design proposals.
+
+Critique dimensions:
+1. Color theory: Is the palette harmonious? Does it evoke the right emotions?
+2. Typography: Are the fonts legible? Do heading/body fonts complement each other?
+3. Layout: Is the section order logical? Will users scroll or bounce?
+4. Brand fit: Does the design truly match THIS specific business, or is it generic?
+5. Conversion: Are CTAs prominent enough? Is the user journey clear?
+6. Accessibility: Are contrast ratios sufficient? Is text readable?
+7. Mobile UX: Will this work on a phone screen?
+
+Be specific in your critique. Point to exact elements that need improvement.
+If the design is genuinely good, acknowledge it but still suggest refinements.
+
+Return: {"critique": "<detailed_critique>", "severity": "minor|moderate|major",
+         "suggestions": [<specific_fixes>], "confidence": <0-1>}
+""",
+)
+
+# ---------------------------------------------------------------------------
+# 11. SEO Optimizer Agent — Advanced SEO Strategy
+# ---------------------------------------------------------------------------
+seo_optimizer_agent = Agent(
+    name="SEO Optimizer",
+    model=settings.model_seo,
+    instructions="""
+You are an advanced SEO strategist for Polish local businesses.
+Beyond basic SEO scoring, you provide:
+
+1. Local SEO strategy:
+   - Google Business Profile optimization recommendations
+   - NAP consistency checks (Name, Address, Phone)
+   - Local schema markup recommendations
+   - Google Maps optimization tips
+
+2. Content SEO:
+   - Semantic keyword clusters (not just individual keywords)
+   - Search intent analysis for local queries
+   - Content gap analysis vs competitors
+   - Featured snippet optimization opportunities
+
+3. Technical SEO:
+   - Core Web Vitals optimization path
+   - Structured data recommendations (LocalBusiness, Service, FAQ)
+   - Internal linking strategy for multi-page potential
+   - Image optimization (alt text, WebP format, lazy loading)
+
+4. Competitive SEO:
+   - Keyword difficulty assessment
+   - Ranking opportunity estimation
+   - Backlink strategy for local businesses
+
+Return structured JSON with specific, actionable recommendations.
+""",
+    tools=[get_pagespeed_score, check_website_exists, get_technology_stack],
+)
+
+# ---------------------------------------------------------------------------
+# 12. Personalization Agent — Audience-Specific Tuning
+# ---------------------------------------------------------------------------
+personalization_agent = Agent(
+    name="Audience Personalizer",
+    model=settings.model_design,
+    instructions="""
+You are a personalization specialist who tunes website content for specific audiences.
+Given a business profile and generated content, you identify the primary target audience
+and suggest adjustments.
+
+Audience dimensions:
+1. Demographics: age, income, education level typical for this service
+2. Search behavior: how do they typically find this type of business?
+3. Decision factors: what matters most? (price, quality, reviews, location, convenience)
+4. Device usage: primarily mobile or desktop?
+5. Trust signals: what makes this audience trust a business? (certifications, years, reviews)
+
+Adjustments you recommend:
+- Tone of voice (formal vs friendly, technical vs simple)
+- CTA wording (what motivates this audience to act?)
+- Testimonial emphasis (what kind of social proof resonates?)
+- Service presentation (feature-focused vs benefit-focused)
+- Visual preferences (minimal vs rich, photos vs illustrations)
+
+Return: {"audience_profile": {...}, "adjustments": [...], "priority_changes": [...]}
+""",
+)
+
+
+# ===========================================================================
+# Agent Registry — for dynamic access
+# ===========================================================================
+
+AGENT_REGISTRY = {
+    "crawler": crawler_agent,
+    "seo": seo_agent,
+    "design": design_agent,
+    "content": content_agent,
+    "email": email_agent,
+    "qc": qc_agent,
+    "orchestrator": orchestrator_agent,
+    "competitive_intel": competitive_intel_agent,
+    "content_refinement": content_refinement_agent,
+    "design_critic": design_critic_agent,
+    "seo_optimizer": seo_optimizer_agent,
+    "personalization": personalization_agent,
+}
