@@ -114,8 +114,9 @@ class MemoryStore:
     - Automatic memory consolidation
     """
 
-    def __init__(self, redis_url: str = "redis://redis:6379/1"):
-        self._redis_url = redis_url
+    def __init__(self, redis_url: str | None = None):
+        from config import settings
+        self._redis_url = redis_url or settings.memory_redis_url
         self._redis = None
         self._episodic: dict[str, list[EpisodicMemory]] = defaultdict(list)
         self._semantic: dict[str, list[SemanticPattern]] = defaultdict(list)
@@ -486,7 +487,7 @@ class MemoryStore:
 _memory_store: MemoryStore | None = None
 
 
-def get_memory_store(redis_url: str = "redis://redis:6379/1") -> MemoryStore:
+def get_memory_store(redis_url: str | None = None) -> MemoryStore:
     """Get the global memory store instance."""
     global _memory_store
     if _memory_store is None:

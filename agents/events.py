@@ -92,9 +92,11 @@ class EventBus:
         self._max_history: int = 10000
         self._redis_bridge: _RedisBridge | None = None
 
-    async def enable_redis_bridge(self, redis_url: str = "redis://redis:6379/2"):
+    async def enable_redis_bridge(self, redis_url: str | None = None):
         """Enable Redis pub/sub for cross-instance event propagation."""
-        self._redis_bridge = _RedisBridge(redis_url, self)
+        from config import settings
+        url = redis_url or settings.event_redis_url
+        self._redis_bridge = _RedisBridge(url, self)
         await self._redis_bridge.start()
 
     async def publish(self, event: Event):
